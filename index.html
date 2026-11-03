@@ -1,0 +1,1205 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#4338ca">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="甲業題庫">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <title>甲種職業安全衛生業務主管 答題練習系統</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    body { font-family: 'PingFang TC', 'Microsoft JhengHei', sans-serif; }
+    .option-btn { transition: all 0.15s ease-in-out; }
+    .option-btn:hover:not(:disabled) { transform: translateY(-1px); }
+    html { -webkit-text-size-adjust: 100%; }
+    body { padding-bottom: env(safe-area-inset-bottom); }
+    button, input, textarea, select { touch-action: manipulation; }
+    button { min-height: 40px; }
+    input, textarea { font-size: 16px; }
+    @media (max-width: 640px) {
+      header { position: sticky; }
+      header h1 { font-size: 15px; line-height: 1.35; }
+      header .max-w-5xl > div:last-child { width: 100%; flex-wrap: wrap; }
+      #dbStatusBadge { flex: 1; text-align: center; }
+      main { padding-left: 12px !important; padding-right: 12px !important; }
+      #importModal { align-items: flex-end; padding: 0; }
+      #importModal > div { width: 100%; max-height: 92dvh; border-radius: 18px 18px 0 0; padding-bottom: env(safe-area-inset-bottom); }
+      #importModal .p-6 { padding: 16px; }
+      #questionCountInput { width: 92px; }
+      #questionCountInput + span + div { flex-wrap: wrap; }
+      #quizScreen .bg-white.rounded-2xl.p-6 { padding: 16px; }
+      #questionJumpGrid button { width: 36px; height: 36px; }
+    }
+  </style>
+</head>
+<body class="bg-slate-50 min-h-screen text-slate-800">
+
+  <!-- 頂部導覽列 -->
+  <header class="bg-indigo-700 text-white shadow-md sticky top-0 z-30">
+    <div class="max-w-5xl mx-auto px-4 py-3.5 flex flex-wrap justify-between items-center gap-3">
+      <div class="flex items-center space-x-2">
+        <span class="bg-amber-400 text-indigo-950 font-black px-2.5 py-1 rounded text-sm">甲業題庫</span>
+        <h1 class="text-lg md:text-xl font-bold tracking-wide">職業安全衛生業務主管 答題練習系統</h1>
+      </div>
+      <div class="flex items-center space-x-2">
+        <span id="dbStatusBadge" class="text-xs bg-indigo-800 px-3 py-1.5 rounded-full border border-indigo-500">目前題庫：載入中...</span>
+        <button onclick="openImportModal()" class="bg-amber-400 hover:bg-amber-300 text-indigo-950 font-bold px-3.5 py-1.5 rounded-lg text-sm shadow transition flex items-center gap-1.5">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+          匯入完整 PDF 題庫 (精準分章節)
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-5xl mx-auto px-4 py-6">
+
+    <!-- 雲端同步與帳號設定 -->
+    <section id="cloudPanel" class="mb-6 bg-white rounded-2xl shadow-sm border border-indigo-100 p-4 md:p-5 space-y-3">
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h2 class="font-bold text-slate-900">☁️ 電腦 / iPhone 雲端同步</h2>
+          <p class="text-xs text-slate-500 mt-1">登入同一帳號後，可同步題庫與測驗成績</p>
+        </div>
+        <span id="cloudStatusBadge" class="text-xs rounded-full px-3 py-1.5 bg-slate-100 text-slate-600">尚未設定雲端</span>
+      </div>
+      <details id="cloudSettingsDetails" class="border-t border-slate-100 pt-3">
+        <summary class="cursor-pointer text-sm font-semibold text-indigo-700">設定雲端服務與登入帳號</summary>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
+          <label class="text-xs font-semibold text-slate-600">Supabase Project URL
+            <input id="supabaseUrlInput" type="url" placeholder="https://你的專案.supabase.co" class="mt-1 w-full border border-slate-300 rounded-lg px-3 py-2 font-normal">
+          </label>
+          <label class="text-xs font-semibold text-slate-600">Supabase anon / publishable key
+            <input id="supabaseKeyInput" type="password" autocomplete="off" placeholder="貼上公開 anon key（不可使用 service_role）" class="mt-1 w-full border border-slate-300 rounded-lg px-3 py-2 font-normal">
+          </label>
+          <label class="text-xs font-semibold text-slate-600">電子郵件
+            <input id="cloudEmailInput" type="email" autocomplete="username" placeholder="你的電子郵件" class="mt-1 w-full border border-slate-300 rounded-lg px-3 py-2 font-normal">
+          </label>
+          <label class="text-xs font-semibold text-slate-600">密碼
+            <input id="cloudPasswordInput" type="password" autocomplete="current-password" placeholder="至少 6 個字元" class="mt-1 w-full border border-slate-300 rounded-lg px-3 py-2 font-normal">
+          </label>
+        </div>
+        <div class="flex flex-wrap gap-2 mt-3">
+          <button onclick="saveCloudConfig()" class="bg-slate-800 text-white rounded-lg px-4 py-2 text-sm font-semibold">儲存雲端設定</button>
+          <button onclick="cloudSignUp()" class="bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-lg px-4 py-2 text-sm font-semibold">註冊帳號</button>
+          <button onclick="cloudSignIn()" class="bg-indigo-600 text-white rounded-lg px-4 py-2 text-sm font-semibold">登入</button>
+          <button onclick="cloudSignOut()" class="bg-slate-100 text-slate-700 rounded-lg px-4 py-2 text-sm font-semibold">登出</button>
+        </div>
+      </details>
+      <div class="flex flex-wrap gap-2">
+        <button onclick="cloudSyncPull()" class="bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-lg px-4 py-2 text-sm font-semibold">↓ 從雲端下載到本機</button>
+        <button onclick="cloudSyncPush()" class="bg-indigo-600 text-white rounded-lg px-4 py-2 text-sm font-semibold">↑ 將本機資料上傳雲端</button>
+      </div>
+      <p id="cloudMessage" class="text-xs text-slate-500" aria-live="polite">首次使用需先建立 Supabase 專案、執行附贈 SQL，再於上方填入 URL 和 anon key。</p>
+      <p id="historySummary" class="text-xs text-slate-500"></p>
+    </section>
+
+
+    <!-- ==================== 1. 設定與章節選擇畫面 ==================== -->
+    <section id="setupScreen" class="space-y-6">
+      
+      <!-- 提示橫幅 -->
+      <div id="importNotice" class="bg-indigo-50 border-l-4 border-indigo-600 p-4 rounded-r-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <h2 class="font-bold text-indigo-950 text-sm md:text-base">💡 已修復章節分類辨識引擎！</h2>
+          <p class="text-xs md:text-sm text-indigo-800 mt-0.5">如果您之前匯入的題目都擠在同一個分類，請點擊右上角「匯入完整 PDF 題庫」重新選擇一次 PDF 檔案，系統會嘗試依題庫章節標題分類，匯入後請檢查各章節題數。</p>
+        </div>
+        <button onclick="openImportModal()" class="shrink-0 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-4 py-2 rounded-lg shadow">立即重新匯入 PDF</button>
+      </div>
+
+      <!-- 1. 選擇練習項目 -->
+      <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 md:p-6">
+        <div class="flex flex-wrap justify-between items-center gap-2 mb-4 pb-3 border-b border-slate-100">
+          <div>
+            <h2 class="text-lg font-bold text-slate-900">1. 選擇要練習的項目（可複選）</h2>
+            <p class="text-xs text-slate-500 mt-0.5">勾選您想測驗的章節，右上角顯示該章節目前的題目數量</p>
+          </div>
+          <div class="flex space-x-2">
+            <button onclick="toggleAllCategories(true)" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold px-3 py-1.5 rounded-lg transition">全選</button>
+            <button onclick="toggleAllCategories(false)" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold px-3 py-1.5 rounded-lg transition">全部取消</button>
+          </div>
+        </div>
+
+        <!-- 16大分類 Checkbox Grid -->
+        <div id="categoryGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5"></div>
+
+        <div class="mt-4 pt-3 border-t border-slate-100 flex justify-between items-center text-sm">
+          <span class="text-slate-600">已勾選 <strong id="selectedCatCount" class="text-indigo-600">0</strong> 個項目</span>
+          <span class="text-slate-600">可用題庫總數：<strong id="availableQuestionCount" class="text-indigo-600 text-base">0</strong> 題</span>
+        </div>
+      </div>
+
+      <!-- 2. 設定題數與測驗模式 -->
+      <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 md:p-6">
+        <h2 class="text-lg font-bold text-slate-900 mb-4 pb-3 border-b border-slate-100">2. 測驗設定</h2>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <!-- 題目數量 -->
+          <div>
+            <label class="block text-sm font-bold text-slate-700 mb-2">填寫要測驗的題目數量：</label>
+            <div class="flex items-center space-x-2">
+              <input type="number" id="questionCountInput" min="1" value="20" class="w-28 px-3.5 py-2 border border-slate-300 rounded-xl font-bold text-indigo-700 focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+              <span class="text-sm text-slate-500">題</span>
+              <div class="flex space-x-1.5 ml-2">
+                <button onclick="setQuickCount(10)" class="text-xs bg-slate-100 hover:bg-indigo-50 hover:text-indigo-600 px-2.5 py-1.5 rounded-lg font-medium border border-slate-200">10題</button>
+                <button onclick="setQuickCount(25)" class="text-xs bg-slate-100 hover:bg-indigo-50 hover:text-indigo-600 px-2.5 py-1.5 rounded-lg font-medium border border-slate-200">25題</button>
+                <button onclick="setQuickCount(50)" class="text-xs bg-slate-100 hover:bg-indigo-50 hover:text-indigo-600 px-2.5 py-1.5 rounded-lg font-medium border border-slate-200">50題</button>
+                <button onclick="setQuickCount('all')" class="text-xs bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-2.5 py-1.5 rounded-lg font-bold border border-indigo-200">全部</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- 答題回饋模式 -->
+          <div>
+            <label class="block text-sm font-bold text-slate-700 mb-2">作答模式：</label>
+            <div class="grid grid-cols-2 gap-2.5">
+              <label class="flex items-center p-2.5 border rounded-xl cursor-pointer bg-indigo-50/60 border-indigo-300">
+                <input type="radio" name="quizMode" value="practice" checked class="text-indigo-600 focus:ring-indigo-500 mr-2">
+                <div>
+                  <div class="text-sm font-bold text-slate-800">練習模式（即時看答案）</div>
+                  <div class="text-xs text-slate-500">點選按鈕後立刻顯示對錯</div>
+                </div>
+              </label>
+              <label class="flex items-center p-2.5 border rounded-xl cursor-pointer hover:bg-slate-50 border-slate-200">
+                <input type="radio" name="quizMode" value="exam" class="text-indigo-600 focus:ring-indigo-500 mr-2">
+                <div>
+                  <div class="text-sm font-bold text-slate-800">模擬測驗模式</div>
+                  <div class="text-xs text-slate-500">全部答完交卷才公布成績</div>
+                </div>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-6 pt-4 border-t border-slate-100 flex flex-col sm:flex-row justify-between items-center gap-3">
+          <div class="text-xs text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-200">
+            ✓ 已啟用「選項隨機洗牌」：每次出題 (1)(2)(3)(4) 選項皆會隨機重新排列，避免只背答案位置。
+          </div>
+          <button onclick="startQuiz()" class="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-8 py-3 rounded-xl shadow-md hover:shadow-lg transition text-base">
+            開始答題練習 →
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== 2. 答題進行畫面 ==================== -->
+    <section id="quizScreen" class="hidden space-y-5">
+      <!-- 進度列 -->
+      <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 flex flex-wrap justify-between items-center gap-3">
+        <button onclick="confirmExitQuiz()" class="text-xs font-semibold text-slate-500 hover:text-slate-800 flex items-center gap-1">
+          ← 返回重選項目
+        </button>
+        <div class="flex items-center gap-3">
+          <span id="currentCategoryBadge" class="text-xs font-bold bg-indigo-100 text-indigo-800 px-3 py-1 rounded-full">章節名稱</span>
+          <span class="text-sm font-bold text-slate-700">第 <span id="currentIndexText" class="text-indigo-600 text-lg">1</span> / <span id="totalQuizCountText">20</span> 題</span>
+        </div>
+        <button onclick="finishQuiz()" class="text-xs bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold px-3 py-1.5 rounded-lg border border-rose-200">提前交卷結算</button>
+      </div>
+
+      <!-- 題目卡片 -->
+      <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 md:p-8">
+        <div class="flex items-start gap-3 mb-6">
+          <span id="qNumberCircle" class="shrink-0 bg-indigo-600 text-white font-bold w-8 h-8 rounded-lg flex items-center justify-center text-sm">1</span>
+          <h3 id="questionText" class="text-lg md:text-xl font-bold text-slate-900 leading-relaxed">題目載入中...</h3>
+        </div>
+
+        <!-- 選項按鈕區 (隨機排序) -->
+        <div id="optionsContainer" class="space-y-3"></div>
+
+        <!-- 即時解析回饋區 -->
+        <div id="feedbackBox" class="hidden mt-5 p-4 rounded-xl border text-sm"></div>
+
+        <!-- 底部切換題按鈕 -->
+        <div class="mt-7 pt-4 border-t border-slate-100 flex justify-between items-center">
+          <button id="prevBtn" onclick="navigateQuestion(-1)" class="px-5 py-2.5 rounded-xl border border-slate-300 text-slate-700 font-semibold text-sm hover:bg-slate-100 disabled:opacity-40">
+            ← 上一題
+          </button>
+          <div class="text-xs text-slate-400" id="origNumHint">原題庫題號：#1</div>
+          <button id="nextBtn" onclick="navigateQuestion(1)" class="px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm shadow">
+            下一題 →
+          </button>
+        </div>
+      </div>
+
+      <!-- 題號快速跳轉面板 -->
+      <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4">
+        <div class="text-xs font-bold text-slate-500 mb-2.5">題號快速跳轉（點擊題號可直接切換）：</div>
+        <div id="questionJumpGrid" class="flex flex-wrap gap-1.5"></div>
+      </div>
+    </section>
+
+    <!-- ==================== 3. 測驗結果與錯題檢討畫面 ==================== -->
+    <section id="resultScreen" class="hidden space-y-6">
+      <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 md:p-8 text-center">
+        <h2 class="text-2xl font-black text-slate-900">測驗結果統計</h2>
+        <div class="my-6 inline-flex flex-col items-center justify-center w-36 h-36 rounded-full bg-indigo-50 border-4 border-indigo-600">
+          <span class="text-xs text-indigo-600 font-bold">測驗得分</span>
+          <span id="scoreValue" class="text-4xl font-black text-indigo-700">100</span>
+          <span class="text-xs text-slate-500">分</span>
+        </div>
+
+        <div class="grid grid-cols-3 gap-3 max-w-md mx-auto text-sm mb-6">
+          <div class="bg-emerald-50 border border-emerald-200 p-3 rounded-xl">
+            <div class="text-emerald-600 text-xs font-bold">答對題數</div>
+            <div id="correctCountText" class="text-xl font-black text-emerald-700">0</div>
+          </div>
+          <div class="bg-rose-50 border border-rose-200 p-3 rounded-xl">
+            <div class="text-rose-600 text-xs font-bold">答錯 / 未答</div>
+            <div id="wrongCountText" class="text-xl font-black text-rose-700">0</div>
+          </div>
+          <div class="bg-slate-50 border border-slate-200 p-3 rounded-xl">
+            <div class="text-slate-500 text-xs font-bold">總測驗題數</div>
+            <div id="totalResultCountText" class="text-xl font-black text-slate-800">0</div>
+          </div>
+        </div>
+
+        <div class="flex flex-wrap justify-center gap-3">
+          <button onclick="retrySameQuestions()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-6 py-2.5 rounded-xl shadow transition text-sm">
+            重新測驗本回題目（選項重新隨機）
+          </button>
+          <button id="retryWrongBtn" onclick="retryWrongQuestions()" class="bg-rose-600 hover:bg-rose-700 text-white font-bold px-6 py-2.5 rounded-xl shadow transition text-sm">
+            只練習本回錯題
+          </button>
+          <button onclick="backToSetup()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-6 py-2.5 rounded-xl transition text-sm">
+            返回首頁重新選擇項目
+          </button>
+        </div>
+      </div>
+
+      <!-- 詳細作答檢討清單 -->
+      <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 md:p-6">
+        <div class="flex justify-between items-center mb-4 pb-3 border-b border-slate-100">
+          <h3 class="text-lg font-bold text-slate-900">作答詳細檢討</h3>
+          <div class="flex gap-2">
+            <button onclick="renderReviewList('all')" class="text-xs px-3 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 font-semibold">顯示全部</button>
+            <button onclick="renderReviewList('wrong')" class="text-xs px-3 py-1 rounded-lg bg-rose-50 text-rose-700 hover:bg-rose-100 font-semibold">只看錯題</button>
+          </div>
+        </div>
+        <div id="reviewListContainer" class="space-y-4"></div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ==================== 匯入 PDF / 文字 彈出視窗 ==================== -->
+  <div id="importModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-2xl w-full shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[90vh]">
+      <div class="bg-indigo-700 text-white px-6 py-4 flex justify-between items-center">
+        <h3 class="font-bold text-lg">匯入《甲業題庫.pdf》完整 800+ 題庫（含強化章節分類）</h3>
+        <button onclick="closeImportModal()" class="text-indigo-200 hover:text-white text-xl font-bold">&times;</button>
+      </div>
+      
+      <div class="p-6 overflow-y-auto space-y-5 text-sm">
+        <!-- 方式 A：直接選擇 PDF 檔案 -->
+        <div class="bg-indigo-50 border-2 border-dashed border-indigo-300 rounded-xl p-5 text-center">
+          <div class="font-bold text-indigo-950 text-base mb-1">方法 A：直接選取您的《甲業題庫.pdf》檔案（最推薦）</div>
+          <p class="text-xs text-indigo-700 mb-3">系統會在您的瀏覽器內自動讀取全部 59 頁，並精準切分出 16 大章節題庫</p>
+          <input type="file" id="pdfFileInput" accept="application/pdf" class="hidden" onchange="handlePdfUpload(event)">
+          <button onclick="document.getElementById('pdfFileInput').click()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-5 py-2.5 rounded-xl shadow text-sm inline-flex items-center gap-2">
+            📄 點此選擇 PDF 檔案自動解析
+          </button>
+          <div id="pdfParseStatus" class="mt-2 text-xs font-bold text-emerald-700"></div>
+        </div>
+
+        <!-- 方式 B：貼上文字 -->
+        <div>
+          <div class="font-bold text-slate-800 mb-1">方法 B：或從 PDF 全選 (Ctrl+A) 複製文字貼在下方：</div>
+          <textarea id="rawTextInput" rows="6" placeholder="打開 PDF 按 Ctrl+A 全選、Ctrl+C 複製，然後在此處按 Ctrl+V 貼上..." class="w-full p-3 border border-slate-300 rounded-xl text-xs font-mono focus:ring-2 focus:ring-indigo-500 focus:outline-none"></textarea>
+          <button onclick="parseFromTextarea()" class="mt-2 w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl shadow">
+            解析貼上的文字並儲存題庫
+          </button>
+        </div>
+
+        <!-- 各章節解析結果預覽 -->
+        <div id="parseReportBox" class="hidden bg-slate-50 border border-slate-200 rounded-xl p-4">
+          <div class="font-bold text-slate-800 mb-2">📊 章節解析統計結果：</div>
+          <div id="parseReportList" class="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-xs"></div>
+        </div>
+      </div>
+
+      <div class="bg-slate-50 px-6 py-3 border-t border-slate-200 flex justify-between items-center">
+        <button onclick="resetToDefaultDB()" class="text-xs text-rose-600 hover:underline font-medium">清除快取並還原預設範例題</button>
+        <button onclick="closeImportModal()" class="bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold px-5 py-1.5 rounded-lg text-sm">關閉視窗</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // 設定 PDF.js Worker
+    if (window['pdfjsLib']) {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    }
+
+    // ==================== 使用者指定的 16 大標準章節名稱 ====================
+    const STANDARD_CATEGORIES = [
+      "企業經營風險與安全衛生",
+      "職業安全相關法規",
+      "職業安全衛生概論",
+      "職業安全衛生管理系統介紹",
+      "承攬管理",
+      "採購管理",
+      "緊急應變管理",
+      "墜落危害預防管理實務",
+      "機械安全管理實務",
+      "火災爆炸預防管理實務",
+      "感電危害預防管理實務",
+      "倒塌崩塌危害預防管理實務",
+      "化學品危害預防管理實務",
+      "物理性危害預防管理實務",
+      "健康管理與健康促進",
+      "職業災害調查處理與統計"
+    ];
+
+    // 內建代表性題庫（每個章節預載代表題，匯入 PDF 後即擴充至 860+ 題）
+    const DEFAULT_QUESTIONS = [
+      { category: "企業經營風險與安全衛生", origNum: 1, q: "達成失能傷害平均在0.13以下，是職業安全衛生管理計畫中哪一項？", options: ["基本方針", "實施細目", "計畫目標", "預定進度"], ans: 2 },
+      { category: "企業經營風險與安全衛生", origNum: 2, q: "下列何者非意外災害發生的基本原因？", options: ["未提供安全設備", "承攬商管理不良", "安全衛生管理不善", "危害確認不足"], ans: 0 },
+      { category: "企業經營風險與安全衛生", origNum: 8, q: "下列何者為發揮安全衛生之功能的主要關鍵？", options: ["建立安全衛生管理計畫", "研議安全衛生教育訓練計畫", "良好溝通與協調", "研議各項安全衛生提案"], ans: 2 },
+      { category: "職業安全相關法規", origNum: 1, q: "職業安全衛生法之目的，在於保障工作者的：", options: ["生命財產", "賺錢", "勞資合諧", "安全與健康"], ans: 3 },
+      { category: "職業安全相關法規", origNum: 2, q: "依職業安全衛生法之規定，下列何者非屬「工作者」之定義？", options: ["承攬商", "其他受工作場所負責人指揮或監督從事勞動之人員", "自營作業者", "勞工"], ans: 0 },
+      { category: "職業安全相關法規", origNum: 29, q: "事業單位工作場所發生勞工死亡職業災害時，雇主應於幾小時內報告當地勞動檢查機構？", options: ["8", "36", "48", "72"], ans: 0 },
+      { category: "職業安全衛生概論", origNum: 1, q: "零災害運動的3大原則，通常不包括下列何者？", options: ["要求完美", "以零為目標", "先知先制", "全員參加"], ans: 0 },
+      { category: "職業安全衛生概論", origNum: 7, q: "下列何者為預防職業災害應優先考量之手段？", options: ["消除或取代危害發生源", "提供個人防護具", "教育訓練", "行政管理"], ans: 0 },
+      { category: "職業安全衛生管理系統介紹", origNum: 1, q: "職業安全衛生管理系統之主要架構運作，職業安全衛生活動的最高指導原則為下列何者？", options: ["職業安全衛生計畫", "職業安全衛生政策", "職業安全衛生方針", "職業安全衛生方案"], ans: 1 },
+      { category: "職業安全衛生管理系統介紹", origNum: 4, q: "FTA為下列何種評估方法之縮寫？", options: ["危害及可操作性分析", "失誤模式與影響分析", "初步危害分析", "故障樹分析"], ans: 3 },
+      { category: "承攬管理", origNum: 2, q: "依職業安全衛生法規定，二個以上之事業單位分別出資共同承攬時，防止職業災害之雇主責任應由誰負責？", options: ["出資較多的事業單位", "二事業單位一起負責", "勞工人數較多的事業單位", "此二事業單位互推一人為代表人"], ans: 3 },
+      { category: "採購管理", origNum: 1, q: "某家工廠對內部人員異動，導入新製程、新工作程序時，均會重新評估其對職業安全衛生管理產生的影響，並採取適當的預防措施，則該項管理措施稱為下列何者？", options: ["自動檢查", "採購管理", "變更管理", "承攬管理"], ans: 2 },
+      { category: "緊急應變管理", origNum: 1, q: "下列何者為燒傷急救口訣？", options: ["沖脫泡蓋送", "叫叫壓", "拉拉壓", "快狠準"], ans: 0 },
+      { category: "墜落危害預防管理實務", origNum: 1, q: "對於移動式施工架之使用，下列做法何者有誤？", options: ["攀爬施工架上下時，手足應確實抓緊及踏穩", "確認安全帶已勾掛妥實", "應注意腳底踏踩位置避免扭傷", "於結構物上突出之鐵件應予以拔除，釘入"], ans: 0 },
+      { category: "機械安全管理實務", origNum: 1, q: "輸送帶尾輪之清潔作業，較常發生下列何種災害？", options: ["物體飛落", "擦傷", "被撞", "被夾、被捲"], ans: 3 },
+      { category: "火災爆炸預防管理實務", origNum: 1, q: "金屬鋰、金屬鈉與金屬鉀等物質之保存方式，下列何者最佳？", options: ["儲存於石油醚中", "放置於空氣中", "放置於水中", "儲存於含水酒精中"], ans: 0 },
+      { category: "感電危害預防管理實務", origNum: 1, q: "對於感電災害之緊急應變，下列何者最優先進行？", options: ["CPR", "通報", "設法切斷電源", "搶救"], ans: 2 },
+      { category: "倒塌崩塌危害預防管理實務", origNum: 1, q: "為確保鋼筋儲存時之安全性，下列何者有誤？", options: ["應使用纜索等加以適當捆紮", "應遠離電源", "可加裝護套", "應盡可能堆高以節省空間"], ans: 3 },
+      { category: "化學品危害預防管理實務", origNum: 1, q: "下列何者較難進入人體肺泡區？", options: ["奈米微粒", "胸腔性微粒", "可呼吸性微粒", "氧氣"], ans: 1 },
+      { category: "物理性危害預防管理實務", origNum: 1, q: "暴露於下列何種環境溫度以上時，對人體開始較會有熱蓄積危害？", options: ["29℃", "27℃", "35℃", "31℃"], ans: 2 },
+      { category: "健康管理與健康促進", origNum: 1, q: "職業健康促進活動中，下列何者不屬推行健康生活範圍？", options: ["投資理財", "營養指導", "菸害防制", "體重管理"], ans: 0 },
+      { category: "職業災害調查處理與統計", origNum: 1, q: "職業災害統計中對於暫時全失能定義為下列何者？", options: ["死亡", "部分永久全失能", "輕傷害", "暫時不能恢復工作1日以上"], ans: 3 }
+    ];
+
+    const STORAGE_KEY = "osh_supervisor_quiz_db_v3";
+    const HISTORY_KEY = "osh_supervisor_quiz_history_v1";
+    const CLOUD_CONFIG_KEY = "osh_supervisor_cloud_config_v1";
+    let questionDB = [];
+    let quizHistory = [];
+    let cloudClient = null;
+    let cloudUser = null;
+    let selectedCategories = new Set(STANDARD_CATEGORIES);
+
+    // 測驗狀態變數
+    let currentQuizList = [];
+    let currentQuestionIndex = 0;
+    let quizMode = "practice";
+
+    // ==================== 初始化載入 ====================
+    window.addEventListener("DOMContentLoaded", () => {
+      loadDatabase();
+      loadQuizHistory();
+      renderCategoryCheckboxes();
+      updateAvailableCount();
+      loadCloudConfig();
+      registerServiceWorker();
+    });
+
+    function loadDatabase() {
+      try {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            questionDB = parsed;
+            updateHeaderBadge();
+            return;
+          }
+        }
+      } catch (e) { console.error("讀取本機題庫失敗", e); }
+      questionDB = [...DEFAULT_QUESTIONS];
+      updateHeaderBadge();
+    }
+
+    function persistLocalData() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(questionDB));
+        localStorage.setItem(HISTORY_KEY, JSON.stringify(quizHistory));
+        return true;
+      } catch (e) {
+        console.error("本機儲存失敗", e);
+        setCloudMessage("本機儲存空間不足或被瀏覽器限制，請先匯出/同步資料。", true);
+        return false;
+      }
+    }
+
+    function loadQuizHistory() {
+      try {
+        const saved = JSON.parse(localStorage.getItem(HISTORY_KEY) || "[]");
+        quizHistory = Array.isArray(saved) ? saved : [];
+      } catch (e) { quizHistory = []; }
+      renderHistorySummary();
+    }
+
+    function renderHistorySummary() {
+      const el = document.getElementById("historySummary");
+      if (!el) return;
+      const avg = quizHistory.length ? Math.round(quizHistory.reduce((s, h) => s + (h.score || 0), 0) / quizHistory.length) : 0;
+      el.textContent = quizHistory.length ? `本機保存 ${quizHistory.length} 筆測驗紀錄，平均 ${avg} 分。登入後可同步到其他裝置。` : "目前尚無測驗紀錄。";
+    }
+
+    function setCloudMessage(message, isError=false) {
+      const el = document.getElementById("cloudMessage");
+      if (el) { el.textContent = message; el.className = `text-xs ${isError ? "text-rose-600" : "text-slate-500"}`; }
+    }
+
+    function setCloudBadge(message, good=false) {
+      const el = document.getElementById("cloudStatusBadge");
+      if (el) { el.textContent = message; el.className = `text-xs rounded-full px-3 py-1.5 ${good ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-600"}`; }
+    }
+
+    function updateHeaderBadge() {
+      const badge = document.getElementById("dbStatusBadge");
+      badge.textContent = `目前題庫：共 ${questionDB.length} 題`;
+      const notice = document.getElementById("importNotice");
+      if (questionDB.length > 500) {
+        notice.className = "bg-emerald-50 border-l-4 border-emerald-600 p-4 rounded-r-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3";
+        notice.innerHTML = `
+          <div>
+            <h2 class="font-bold text-emerald-950 text-sm md:text-base">✅ 已載入題庫（共 ${questionDB.length} 題）！</h2>
+            <p class="text-xs text-emerald-800 mt-0.5">題庫已保存在此裝置的瀏覽器中，請直接在下方勾選想練習的章節開始測驗。</p>
+          </div>
+          <button onclick="openImportModal()" class="shrink-0 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3.5 py-2 rounded-lg">重新匯入/檢視統計</button>
+        `;
+      }
+    }
+
+    // ==================== 核心修復：100% 精準章節切割與題庫解析引擎 ====================
+    // 針對《甲業題庫.pdf》設計的章節錨點規則：每個章節標題後面必定緊接著第 1 題 "(1~4)1."
+    const SECTION_MARKERS = [
+      { category: "企業經營風險與安全衛生", regex: /企業經營風險與安全衛生(?:\s*\(含組織協調與溝通\))?\s*(?=\([1-4I]\)\s*1\.)/ },
+      { category: "職業安全相關法規", regex: /職業安全(?:衛生)?相關法規\s*(?=\([1-4I]\)\s*1\.)/ },
+      { category: "職業安全衛生概論", regex: /職業安全衛生概論\s*(?=\([1-4I]\)\s*1\.)/ },
+      { category: "職業安全衛生管理系統介紹", regex: /職業安全衛生管理系統介紹\s*(?=\([1-4I]\)\s*1\.)/ },
+      // PDF 第30頁有獨立的「風險評估」章節(共39題)，自動歸入「職業安全衛生管理系統介紹」或「企業經營風險與安全衛生」
+      { category: "職業安全衛生管理系統介紹", regex: /風險評估\s*(?=\([1-4I]\)\s*1\.)/ },
+      { category: "承攬管理", regex: /承攬管理\s*(?=\([1-4I]\)\s*1\.)/ },
+      { category: "採購管理", regex: /採購管理\s*(?=\([1-4I]\)\s*1\.)/ },
+      { category: "緊急應變管理", regex: /緊急應變管理(?:\s*\(含急救\))?\s*(?=\([1-4I]\)\s*1\.)/ },
+      { category: "墜落危害預防管理實務", regex: /墜落危害預防管理實務\s*(?=\([1-4I]\)\s*1\.)/ },
+      { category: "機械安全管理實務", regex: /機械安全管理實務\s*(?=\([1-4I]\)\s*1\.)/ },
+      { category: "火災爆炸預防管理實務", regex: /火災爆炸預防管理實務\s*(?=\([1-4I]\)\s*1\.)/ },
+      { category: "感電危害預防管理實務", regex: /感電危害預防管理實務\s*(?=\([1-4I]\)\s*1\.)/ },
+      { category: "倒塌崩塌危害預防管理實務", regex: /倒塌崩塌危害預防管理實務(?:\s*\(含物體飛落[、,]?被撞危害預防\))?\s*(?=\([1-4I]\)\s*1\.)/ },
+      { category: "化學品危害預防管理實務", regex: /化學[性品]危害預防管理實務(?:\s*\(含缺氧危害預防\))?\s*(?=\([1-4I]\)\s*1\.)/ },
+      { category: "物理性危害預防管理實務", regex: /物理性危害預防管理實務(?:\s*\(含人因危害預防\))?\s*(?=\([1-4I]\)\s*1\.)/ },
+      { category: "健康管理與健康促進", regex: /健康管理與健康促進\s*(?=\([1-4I]\)\s*1\.)/ },
+      { category: "職業災害調查處理與統計", regex: /職業災害調查處理與統計\s*(?=\([1-4I]\)\s*1\.)/ }
+    ];
+
+    function parseFullPdfText(rawText) {
+      // 1. 清理全形括號、頁首與頁碼雜訊
+      let cleaned = rawText
+        .replace(/（/g, "(")
+        .replace(/）/g, ")")
+        .replace(/職業安全衛生業務主管練習題庫\s*2024\.07\s*張志杰/g, " ")
+        .replace(/\*{2,}.*?\*{2,}/g, " ")
+        .replace(/\\/g, " ")
+        .replace(/\r?\n/g, " ")
+        .replace(/\s+/g, " ");
+
+      // 2. 定位所有章節標題在全文中的起始座標
+      let foundSections = [];
+      for (const marker of SECTION_MARKERS) {
+        const match = marker.regex.exec(cleaned);
+        if (match) {
+          foundSections.push({
+            category: marker.category,
+            startIndex: match.index,
+            contentStart: match.index + match[0].length
+          });
+        }
+      }
+
+      // 依照在 PDF 中出現的先後順序排列
+      foundSections.sort((a, b) => a.startIndex - b.startIndex);
+
+      // 若使用者只貼上單一章節或部分題目，保底使用預設分類
+      if (foundSections.length === 0) {
+        foundSections.push({
+          category: "企業經營風險與安全衛生",
+          startIndex: 0,
+          contentStart: 0
+        });
+      }
+
+      let parsedQuestions = [];
+
+      // 3. 逐一章節切出區塊並解析該章節內的所有題目
+      for (let s = 0; s < foundSections.length; s++) {
+        const currentSec = foundSections[s];
+        const nextSecStart = (s + 1 < foundSections.length) ? foundSections[s + 1].startIndex : cleaned.length;
+        const sectionText = cleaned.slice(currentSec.contentStart, nextSecStart);
+
+        // 找出該章節內所有形如 (3)15. 或 (1) 2. 的題目開頭
+        const qHeaderRegex = /\(([1-4I])\)\s*(\d{1,3})\s*[\.、]?\s*/g;
+        let matches = [];
+        let m;
+        while ((m = qHeaderRegex.exec(sectionText)) !== null) {
+          const ansChar = m[1] === "I" ? "1" : m[1];
+          const qNum = parseInt(m[2], 10);
+
+          // 排除題目中間像 "(1) 5 (2) 6" 的選項被誤判為題號：
+          // 檢查題號是否合理遞增（允許偶爾跳號如 255 -> 257）
+          if (matches.length > 0) {
+            const prevNum = matches[matches.length - 1].qNum;
+            if (qNum < prevNum || qNum > prevNum + 5) {
+              continue; 
+            }
+          }
+
+          matches.push({
+            ansIndex: parseInt(ansChar, 10) - 1,
+            qNum: qNum,
+            qStart: m.index,
+            bodyStart: m.index + m[0].length
+          });
+        }
+
+        // 4. 解析每一題的題幹與 (1)(2)(3)(4) 選項
+        for (let i = 0; i < matches.length; i++) {
+          const curQ = matches[i];
+          const nextQStart = (i + 1 < matches.length) ? matches[i + 1].qStart : sectionText.length;
+          let block = sectionText.slice(curQ.bodyStart, nextQStart).trim();
+
+          // 移除夾在題尾的單獨頁碼 (例如 "...(4)服務 1")
+          block = block.replace(/\s+\d{1,2}\s*$/, "");
+
+          // 尋找最後一組 (1)...(2)...(3)...(4)...
+          const idx1 = block.lastIndexOf("(1)");
+          const idx2 = block.indexOf("(2)", idx1);
+          const idx3 = block.indexOf("(3)", idx2);
+          const idx4 = block.indexOf("(4)", idx3);
+
+          if (idx1 !== -1 && idx2 !== -1 && idx3 !== -1 && idx4 !== -1) {
+            const stem = block.slice(0, idx1).trim();
+            const opt1 = cleanOptionText(block.slice(idx1 + 3, idx2));
+            const opt2 = cleanOptionText(block.slice(idx2 + 3, idx3));
+            const opt3 = cleanOptionText(block.slice(idx3 + 3, idx4));
+            const opt4 = cleanOptionText(block.slice(idx4 + 3));
+
+            if (stem && opt1 && opt2 && opt3 && opt4) {
+              parsedQuestions.push({
+                category: currentSec.category,
+                origNum: curQ.qNum,
+                q: stem,
+                options: [opt1, opt2, opt3, opt4],
+                ans: curQ.ansIndex
+              });
+            }
+          }
+        }
+      }
+
+      return parsedQuestions;
+    }
+
+    function cleanOptionText(str) {
+      return str
+        .replace(/[。．.]\s*$/, "")
+        .replace(/\s+\d{1,2}\s*$/, "")
+        .trim();
+    }
+
+    // ==================== 處理 PDF 檔案上傳與文字貼上 ====================
+    async function handlePdfUpload(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const statusEl = document.getElementById("pdfParseStatus");
+      statusEl.textContent = "⏳ 正在讀取 PDF 頁面文字 (共 59 頁)，請稍候 2~3 秒...";
+
+      try {
+        const arrayBuffer = await file.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+        let fullText = "";
+
+        for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+          statusEl.textContent = `⏳ 正在解析第 ${pageNum} / ${pdf.numPages} 頁...`;
+          const page = await pdf.getPage(pageNum);
+          const textContent = await page.getTextContent();
+          const pageText = textContent.items.map(item => item.str).join(" ");
+          fullText += "\n" + pageText;
+        }
+
+        const extracted = parseFullPdfText(fullText);
+        saveExtractedQuestions(extracted, statusEl);
+      } catch (err) {
+        console.error(err);
+        statusEl.textContent = "❌ PDF 讀取失敗，請改用下方「全選複製貼上文字」方式匯入。";
+      }
+    }
+
+    function parseFromTextarea() {
+      const raw = document.getElementById("rawTextInput").value;
+      const statusEl = document.getElementById("pdfParseStatus");
+      if (!raw || raw.trim().length < 50) {
+        alert("請先將 PDF 文字貼入文字框中！");
+        return;
+      }
+      const extracted = parseFullPdfText(raw);
+      saveExtractedQuestions(extracted, statusEl);
+    }
+
+    function saveExtractedQuestions(extracted, statusEl) {
+      if (extracted.length === 0) {
+        statusEl.textContent = "❌ 未偵測到有效題目，請確認檔案或文字內容是否包含題目與 (1)(2)(3)(4) 選項。";
+        return;
+      }
+
+      questionDB = extracted;
+      persistLocalData();
+      updateHeaderBadge();
+      renderCategoryCheckboxes();
+      updateAvailableCount();
+
+      statusEl.textContent = `🎉 成功解析並儲存 ${extracted.length} 道題目！`;
+      showParseReport(extracted);
+      cloudAutoPush("題庫匯入完成");
+    }
+
+    function showParseReport(questions) {
+      const reportBox = document.getElementById("parseReportBox");
+      const reportList = document.getElementById("parseReportList");
+      reportBox.classList.remove("hidden");
+      reportList.innerHTML = "";
+
+      STANDARD_CATEGORIES.forEach(cat => {
+        const count = questions.filter(q => q.category === cat).length;
+        const div = document.createElement("div");
+        div.className = "flex justify-between items-center bg-white px-3 py-1.5 rounded border border-slate-200";
+        div.innerHTML = `<span class="truncate pr-2">${cat}</span><strong class="${count > 0 ? 'text-indigo-600' : 'text-rose-500'}">${count} 題</strong>`;
+        reportList.appendChild(div);
+      });
+    }
+
+    function resetToDefaultDB() {
+      if (!confirm("確定要清除已匯入的題庫，還原為預設範例題嗎？")) return;
+      localStorage.removeItem(STORAGE_KEY);
+      questionDB = [...DEFAULT_QUESTIONS];
+      persistLocalData();
+      updateHeaderBadge();
+      renderCategoryCheckboxes();
+      updateAvailableCount();
+      closeImportModal();
+    }
+
+    // ==================== 章節複選與題數設定 UI ====================
+    function renderCategoryCheckboxes() {
+      const grid = document.getElementById("categoryGrid");
+      grid.innerHTML = "";
+
+      STANDARD_CATEGORIES.forEach((cat, idx) => {
+        const count = questionDB.filter(q => q.category === cat).length;
+        const isChecked = selectedCategories.has(cat);
+
+        const label = document.createElement("label");
+        label.className = `flex items-center justify-between p-3 rounded-xl border cursor-pointer transition ${
+          isChecked ? "bg-indigo-50/80 border-indigo-400 text-indigo-950" : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+        }`;
+
+        label.innerHTML = `
+          <div class="flex items-center space-x-2.5 pr-2 overflow-hidden">
+            <input type="checkbox" value="${cat}" ${isChecked ? "checked" : ""} onchange="toggleCategory('${cat}')" class="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500 shrink-0">
+            <span class="text-sm font-bold truncate" title="${cat}">${idx + 1}. ${cat}</span>
+          </div>
+          <span class="shrink-0 text-xs font-bold px-2 py-0.5 rounded-full ${
+            count > 0 ? "bg-indigo-100 text-indigo-700" : "bg-slate-100 text-slate-400"
+          }">${count} 題</span>
+        `;
+        grid.appendChild(label);
+      });
+    }
+
+    function toggleCategory(cat) {
+      if (selectedCategories.has(cat)) {
+        selectedCategories.delete(cat);
+      } else {
+        selectedCategories.add(cat);
+      }
+      renderCategoryCheckboxes();
+      updateAvailableCount();
+    }
+
+    function toggleAllCategories(selectAll) {
+      if (selectAll) {
+        selectedCategories = new Set(STANDARD_CATEGORIES);
+      } else {
+        selectedCategories.clear();
+      }
+      renderCategoryCheckboxes();
+      updateAvailableCount();
+    }
+
+    function updateAvailableCount() {
+      const available = questionDB.filter(q => selectedCategories.has(q.category)).length;
+      document.getElementById("selectedCatCount").textContent = selectedCategories.size;
+      document.getElementById("availableQuestionCount").textContent = available;
+
+      const input = document.getElementById("questionCountInput");
+      if (parseInt(input.value, 10) > available && available > 0) {
+        input.value = available;
+      }
+    }
+
+    function setQuickCount(val) {
+      const available = questionDB.filter(q => selectedCategories.has(q.category)).length;
+      const input = document.getElementById("questionCountInput");
+      if (val === "all") {
+        input.value = available > 0 ? available : 1;
+      } else {
+        input.value = Math.min(val, available > 0 ? available : val);
+      }
+    }
+
+    // ==================== Fisher-Yates 洗牌演算法（題目與選項隨機排序） ====================
+    function shuffleArray(arr) {
+      const copy = [...arr];
+      for (let i = copy.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [copy[i], copy[j]] = [copy[j], copy[i]];
+      }
+      return copy;
+    }
+
+    // ==================== 開始測驗與作答邏輯 ====================
+    function startQuiz() {
+      const pool = questionDB.filter(q => selectedCategories.has(q.category));
+      if (pool.length === 0) {
+        alert("請至少勾選一個有題目的章節項目！");
+        return;
+      }
+
+      let reqCount = parseInt(document.getElementById("questionCountInput").value, 10);
+      if (isNaN(reqCount) || reqCount < 1) reqCount = 10;
+      reqCount = Math.min(reqCount, pool.length);
+
+      const modeRadio = document.querySelector('input[name="quizMode"]:checked');
+      quizMode = modeRadio ? modeRadio.value : "practice";
+
+      // 隨機抽取指定題數，並對每一題的 (1)(2)(3)(4) 選項重新隨機洗牌
+      const shuffledPool = shuffleArray(pool).slice(0, reqCount);
+      currentQuizList = shuffledPool.map(item => buildShuffledQuestion(item));
+
+      currentQuestionIndex = 0;
+      document.getElementById("setupScreen").classList.add("hidden");
+      document.getElementById("resultScreen").classList.add("hidden");
+      document.getElementById("quizScreen").classList.remove("hidden");
+
+      renderCurrentQuestion();
+      renderJumpGrid();
+    }
+
+    function buildShuffledQuestion(rawItem) {
+      const optionObjs = rawItem.options.map((text, idx) => ({
+        text: text,
+        isCorrect: idx === rawItem.ans,
+        origOptionNumber: idx + 1
+      }));
+
+      return {
+        raw: rawItem,
+        category: rawItem.category,
+        origNum: rawItem.origNum,
+        q: rawItem.q,
+        shuffledOptions: shuffleArray(optionObjs),
+        userSelectedIdx: null
+      };
+    }
+
+    function renderCurrentQuestion() {
+      const item = currentQuizList[currentQuestionIndex];
+      document.getElementById("currentCategoryBadge").textContent = item.category;
+      document.getElementById("currentIndexText").textContent = currentQuestionIndex + 1;
+      document.getElementById("totalQuizCountText").textContent = currentQuizList.length;
+      document.getElementById("qNumberCircle").textContent = currentQuestionIndex + 1;
+      document.getElementById("questionText").textContent = item.q;
+      document.getElementById("origNumHint").textContent = `原分類題號：#${item.origNum}`;
+
+      const container = document.getElementById("optionsContainer");
+      container.innerHTML = "";
+
+      item.shuffledOptions.forEach((opt, idx) => {
+        const btn = document.createElement("button");
+        const isSelected = item.userSelectedIdx === idx;
+        const hasAnswered = item.userSelectedIdx !== null;
+
+        let btnStyle = "bg-white border-slate-200 hover:border-indigo-400 hover:bg-indigo-50/40 text-slate-800";
+
+        if (hasAnswered) {
+          if (quizMode === "practice") {
+            if (opt.isCorrect) {
+              btnStyle = "bg-emerald-50 border-emerald-500 text-emerald-950 font-bold ring-2 ring-emerald-500/30";
+            } else if (isSelected && !opt.isCorrect) {
+              btnStyle = "bg-rose-50 border-rose-500 text-rose-950 font-bold";
+            } else {
+              btnStyle = "bg-slate-50 border-slate-200 text-slate-400 opacity-75";
+            }
+          } else {
+            // 模擬考模式：只標示已選，不洩漏答案
+            if (isSelected) {
+              btnStyle = "bg-indigo-50 border-indigo-600 text-indigo-950 font-bold ring-2 ring-indigo-500/30";
+            }
+          }
+        }
+
+        btn.className = `option-btn w-full text-left p-4 rounded-xl border-2 flex items-center justify-between gap-3 ${btnStyle}`;
+        btn.onclick = () => selectOption(idx);
+
+        btn.innerHTML = `
+          <div class="flex items-center gap-3">
+            <span class="shrink-0 w-7 h-7 rounded-lg bg-slate-100 border border-slate-300 flex items-center justify-center text-xs font-bold text-slate-700">(${idx + 1})</span>
+            <span class="text-base">${opt.text}</span>
+          </div>
+          ${hasAnswered && quizMode === "practice" && opt.isCorrect ? '<span class="text-xs font-bold bg-emerald-600 text-white px-2.5 py-1 rounded-full shrink-0">✓ 正確答案</span>' : ''}
+          ${hasAnswered && quizMode === "practice" && isSelected && !opt.isCorrect ? '<span class="text-xs font-bold bg-rose-600 text-white px-2.5 py-1 rounded-full shrink-0">✗ 您的選擇</span>' : ''}
+        `;
+        container.appendChild(btn);
+      });
+
+      // 即時解析回饋
+      const feedbackBox = document.getElementById("feedbackBox");
+      if (item.userSelectedIdx !== null && quizMode === "practice") {
+        const chosen = item.shuffledOptions[item.userSelectedIdx];
+        const correctOpt = item.shuffledOptions.find(o => o.isCorrect);
+        feedbackBox.classList.remove("hidden");
+        if (chosen.isCorrect) {
+          feedbackBox.className = "mt-5 p-4 rounded-xl border bg-emerald-50 border-emerald-200 text-emerald-900 text-sm";
+          feedbackBox.innerHTML = `<strong>🎉 答對了！</strong> 正確答案為：<strong>${correctOpt.text}</strong>（原 PDF 選項為 (${correctOpt.origOptionNumber})）`;
+        } else {
+          feedbackBox.className = "mt-5 p-4 rounded-xl border bg-rose-50 border-rose-200 text-rose-900 text-sm";
+          feedbackBox.innerHTML = `<strong>❌ 答錯了！</strong> 正確答案應為：<strong>${correctOpt.text}</strong>（原 PDF 選項為 (${correctOpt.origOptionNumber})）`;
+        }
+      } else {
+        feedbackBox.classList.add("hidden");
+      }
+
+      // 上一題 / 下一題按鈕狀態
+      document.getElementById("prevBtn").disabled = currentQuestionIndex === 0;
+      const nextBtn = document.getElementById("nextBtn");
+      if (currentQuestionIndex === currentQuizList.length - 1) {
+        nextBtn.textContent = "完成並交卷結算 ✓";
+        nextBtn.className = "px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm shadow";
+      } else {
+        nextBtn.textContent = "下一題 →";
+        nextBtn.className = "px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm shadow";
+      }
+
+      renderJumpGrid();
+    }
+
+    function selectOption(idx) {
+      const item = currentQuizList[currentQuestionIndex];
+      item.userSelectedIdx = idx;
+      renderCurrentQuestion();
+    }
+
+    function navigateQuestion(delta) {
+      const nextIdx = currentQuestionIndex + delta;
+      if (nextIdx >= 0 && nextIdx < currentQuizList.length) {
+        currentQuestionIndex = nextIdx;
+        renderCurrentQuestion();
+      } else if (nextIdx >= currentQuizList.length) {
+        finishQuiz();
+      }
+    }
+
+    function renderJumpGrid() {
+      const grid = document.getElementById("questionJumpGrid");
+      grid.innerHTML = "";
+
+      currentQuizList.forEach((item, idx) => {
+        const btn = document.createElement("button");
+        let color = "bg-slate-100 text-slate-600 border-slate-200";
+
+        if (item.userSelectedIdx !== null) {
+          if (quizMode === "practice") {
+            const isCorrect = item.shuffledOptions[item.userSelectedIdx].isCorrect;
+            color = isCorrect ? "bg-emerald-100 text-emerald-800 border-emerald-400 font-bold" : "bg-rose-100 text-rose-800 border-rose-400 font-bold";
+          } else {
+            color = "bg-indigo-100 text-indigo-800 border-indigo-400 font-bold";
+          }
+        }
+
+        if (idx === currentQuestionIndex) {
+          color += " ring-2 ring-indigo-600";
+        }
+
+        btn.className = `w-8 h-8 rounded-lg border text-xs flex items-center justify-center transition ${color}`;
+        btn.textContent = idx + 1;
+        btn.onclick = () => {
+          currentQuestionIndex = idx;
+          renderCurrentQuestion();
+        };
+        grid.appendChild(btn);
+      });
+    }
+
+    // ==================== 交卷結算與重做功能 ====================
+    function finishQuiz() {
+      let correct = 0;
+      currentQuizList.forEach(item => {
+        if (item.userSelectedIdx !== null && item.shuffledOptions[item.userSelectedIdx].isCorrect) {
+          correct++;
+        }
+      });
+
+      const total = currentQuizList.length;
+      const wrong = total - correct;
+      const score = Math.round((correct / total) * 100);
+      const wrongQuestions = currentQuizList.filter(item => item.userSelectedIdx === null || !item.shuffledOptions[item.userSelectedIdx].isCorrect).map(item => ({
+        category: item.category, origNum: item.origNum, q: item.q,
+        correctAnswer: (item.shuffledOptions.find(o => o.isCorrect) || {}).text || ""
+      }));
+      quizHistory.unshift({ date: new Date().toISOString(), score, correct, wrong, total, mode: quizMode, wrongQuestions });
+      quizHistory = quizHistory.slice(0, 100);
+      persistLocalData();
+      renderHistorySummary();
+      cloudAutoPush("測驗成績已保存");
+
+      document.getElementById("scoreValue").textContent = score;
+      document.getElementById("correctCountText").textContent = correct;
+      document.getElementById("wrongCountText").textContent = wrong;
+      document.getElementById("totalResultCountText").textContent = total;
+
+      const retryWrongBtn = document.getElementById("retryWrongBtn");
+      if (wrong === 0) {
+        retryWrongBtn.classList.add("hidden");
+      } else {
+        retryWrongBtn.classList.remove("hidden");
+      }
+
+      document.getElementById("quizScreen").classList.add("hidden");
+      document.getElementById("resultScreen").classList.remove("hidden");
+      renderReviewList("all");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    function renderReviewList(filter) {
+      const container = document.getElementById("reviewListContainer");
+      container.innerHTML = "";
+
+      currentQuizList.forEach((item, idx) => {
+        const isCorrect = item.userSelectedIdx !== null && item.shuffledOptions[item.userSelectedIdx].isCorrect;
+        if (filter === "wrong" && isCorrect) return;
+
+        const userChoiceText = item.userSelectedIdx !== null ? item.shuffledOptions[item.userSelectedIdx].text : "（未作答）";
+        const correctOpt = item.shuffledOptions.find(o => o.isCorrect);
+
+        const div = document.createElement("div");
+        div.className = `p-4 rounded-xl border ${isCorrect ? "bg-emerald-50/40 border-emerald-200" : "bg-rose-50/40 border-rose-200"}`;
+        div.innerHTML = `
+          <div class="flex flex-wrap justify-between items-center gap-2 mb-1.5">
+            <span class="text-xs font-bold px-2.5 py-0.5 rounded-full bg-slate-200 text-slate-700">${item.category} (#${item.origNum})</span>
+            <span class="text-xs font-bold ${isCorrect ? "text-emerald-700" : "text-rose-600"}">${isCorrect ? "✓ 答對" : "✗ 答錯 / 未答"}</span>
+          </div>
+          <div class="font-bold text-slate-900 text-sm md:text-base mb-2">${idx + 1}. ${item.q}</div>
+          <div class="text-xs md:text-sm space-y-1">
+            <div class="${isCorrect ? "text-emerald-700 font-semibold" : "text-rose-600 font-semibold"}">您的答案：${userChoiceText}</div>
+            ${!isCorrect ? `<div class="text-emerald-700 font-bold">正確答案：${correctOpt.text}（原 PDF 選項 (${correctOpt.origOptionNumber})）</div>` : ""}
+          </div>
+        `;
+        container.appendChild(div);
+      });
+    }
+
+    function retrySameQuestions() {
+      currentQuizList = shuffleArray(currentQuizList).map(item => buildShuffledQuestion(item.raw));
+      currentQuestionIndex = 0;
+      document.getElementById("resultScreen").classList.add("hidden");
+      document.getElementById("quizScreen").classList.remove("hidden");
+      renderCurrentQuestion();
+    }
+
+    function retryWrongQuestions() {
+      const wrongRawItems = currentQuizList
+        .filter(item => item.userSelectedIdx === null || !item.shuffledOptions[item.userSelectedIdx].isCorrect)
+        .map(item => item.raw);
+
+      if (wrongRawItems.length === 0) return;
+
+      currentQuizList = shuffleArray(wrongRawItems).map(raw => buildShuffledQuestion(raw));
+      currentQuestionIndex = 0;
+      document.getElementById("resultScreen").classList.add("hidden");
+      document.getElementById("quizScreen").classList.remove("hidden");
+      renderCurrentQuestion();
+    }
+
+    function backToSetup() {
+      document.getElementById("quizScreen").classList.add("hidden");
+      document.getElementById("resultScreen").classList.add("hidden");
+      document.getElementById("setupScreen").classList.remove("hidden");
+    }
+
+    function confirmExitQuiz() {
+      if (confirm("確定要結束目前的練習並返回首頁嗎？")) {
+        backToSetup();
+      }
+    }
+
+    // ==================== 彈出視窗開關 ====================
+    function openImportModal() {
+      document.getElementById("importModal").classList.remove("hidden");
+      if (questionDB.length > 50) {
+        showParseReport(questionDB);
+      }
+    }
+
+    function closeImportModal() {
+      document.getElementById("importModal").classList.add("hidden");
+    }
+
+    // ==================== 雲端同步（Supabase） ====================
+    function loadCloudConfig() {
+      try {
+        const cfg = JSON.parse(localStorage.getItem(CLOUD_CONFIG_KEY) || "{}");
+        document.getElementById("supabaseUrlInput").value = cfg.url || "";
+        document.getElementById("supabaseKeyInput").value = cfg.key || "";
+        if (cfg.url && cfg.key) {
+          initCloudClient(cfg.url, cfg.key);
+        } else {
+          setCloudBadge("尚未設定雲端");
+        }
+      } catch (e) { setCloudMessage("讀取雲端設定失敗。", true); }
+    }
+
+    function saveCloudConfig() {
+      const url = document.getElementById("supabaseUrlInput").value.trim().replace(/\/$/, "");
+      const key = document.getElementById("supabaseKeyInput").value.trim();
+      if (!/^https:\/\/.+\.supabase\.co$/.test(url) || !key) {
+        setCloudMessage("請填入正確的 Supabase Project URL 與 anon / publishable key。", true);
+        return;
+      }
+      localStorage.setItem(CLOUD_CONFIG_KEY, JSON.stringify({url, key}));
+      initCloudClient(url, key);
+      setCloudMessage("雲端設定已保存在此裝置。接著請註冊或登入同一個帳號。若要在另一台裝置使用，需在另一台裝置也填入相同設定。", false);
+    }
+
+    function initCloudClient(url, key) {
+      if (!window.supabase || !window.supabase.createClient) {
+        setCloudBadge("雲端函式庫未載入");
+        setCloudMessage("Supabase 程式庫載入失敗，請確認網路連線後重新整理。", true);
+        return;
+      }
+      try {
+        cloudClient = window.supabase.createClient(url, key);
+        cloudClient.auth.getSession().then(({data, error}) => {
+          if (error) throw error;
+          cloudUser = data.session ? data.session.user : null;
+          updateCloudAuthUI();
+        }).catch(err => setCloudMessage("讀取登入狀態失敗：" + err.message, true));
+        cloudClient.auth.onAuthStateChange((_event, session) => {
+          cloudUser = session ? session.user : null;
+          updateCloudAuthUI();
+        });
+      } catch (e) {
+        setCloudMessage("雲端初始化失敗：" + e.message, true);
+      }
+    }
+
+    function updateCloudAuthUI() {
+      if (cloudUser) {
+        setCloudBadge("已登入：" + (cloudUser.email || "雲端帳號"), true);
+        setCloudMessage("已登入雲端。可手動下載雲端資料，或上傳本機題庫與測驗紀錄。題庫匯入及交卷後會嘗試自動上傳。", false);
+      } else if (cloudClient) {
+        setCloudBadge("雲端已設定，尚未登入");
+      }
+    }
+
+    async function cloudSignUp() {
+      if (!cloudClient) { setCloudMessage("請先儲存 Supabase 設定。", true); return; }
+      const email = document.getElementById("cloudEmailInput").value.trim();
+      const password = document.getElementById("cloudPasswordInput").value;
+      if (!email || password.length < 6) { setCloudMessage("請輸入電子郵件及至少 6 個字元的密碼。", true); return; }
+      setCloudMessage("正在建立帳號…");
+      const {data, error} = await cloudClient.auth.signUp({email, password});
+      if (error) { setCloudMessage("註冊失敗：" + error.message, true); return; }
+      if (data.session) {
+        cloudUser = data.user;
+        updateCloudAuthUI();
+        setCloudMessage("帳號建立並登入成功。接著請先下載雲端資料確認，或上傳本機資料。", false);
+      } else {
+        setCloudMessage("註冊申請已送出。請到電子郵件收取驗證信，完成驗證後再登入。", false);
+      }
+    }
+
+    async function cloudSignIn() {
+      if (!cloudClient) { setCloudMessage("請先儲存 Supabase 設定。", true); return; }
+      const email = document.getElementById("cloudEmailInput").value.trim();
+      const password = document.getElementById("cloudPasswordInput").value;
+      if (!email || !password) { setCloudMessage("請輸入電子郵件及密碼。", true); return; }
+      setCloudMessage("正在登入…");
+      const {data, error} = await cloudClient.auth.signInWithPassword({email, password});
+      if (error) { setCloudMessage("登入失敗：" + error.message, true); return; }
+      cloudUser = data.user;
+      updateCloudAuthUI();
+      setCloudMessage("登入成功。為避免覆蓋資料，請先選擇「從雲端下載」或「上傳本機資料」。", false);
+    }
+
+    async function cloudSignOut() {
+      if (!cloudClient) return;
+      const {error} = await cloudClient.auth.signOut();
+      if (error) { setCloudMessage("登出失敗：" + error.message, true); return; }
+      cloudUser = null;
+      setCloudBadge("已登出");
+      setCloudMessage("已從此裝置登出雲端帳號。", false);
+    }
+
+    async function cloudSyncPush() {
+      if (!cloudClient || !cloudUser) { setCloudMessage("請先設定雲端並登入。", true); return; }
+      setCloudMessage("正在上傳題庫與測驗紀錄…");
+      const payload = {
+        user_id: cloudUser.id,
+        question_db: questionDB,
+        quiz_history: quizHistory,
+        updated_at: new Date().toISOString()
+      };
+      const {error} = await cloudClient.from("osh_quiz_data").upsert(payload, {onConflict: "user_id"});
+      if (error) { setCloudMessage("上傳失敗：" + error.message + "。請確認已執行附贈 SQL 並啟用資料表權限。", true); return; }
+      setCloudMessage("✅ 上傳成功！題庫 " + questionDB.length + " 題、測驗紀錄 " + quizHistory.length + " 筆已同步至雲端。", false);
+    }
+
+    async function cloudSyncPull() {
+      if (!cloudClient || !cloudUser) { setCloudMessage("請先設定雲端並登入。", true); return; }
+      if (!confirm("從雲端下載會覆蓋目前這台裝置的題庫與測驗紀錄，確定繼續嗎？建議先上傳本機資料備份。")) return;
+      setCloudMessage("正在下載雲端資料…");
+      const {data, error} = await cloudClient.from("osh_quiz_data").select("question_db,quiz_history,updated_at").eq("user_id", cloudUser.id).maybeSingle();
+      if (error) { setCloudMessage("下載失敗：" + error.message, true); return; }
+      if (!data) { setCloudMessage("雲端尚無資料。請先按「上傳本機資料」建立第一份雲端備份。", false); return; }
+      if (Array.isArray(data.question_db) && data.question_db.length) questionDB = data.question_db;
+      quizHistory = Array.isArray(data.quiz_history) ? data.quiz_history : [];
+      persistLocalData();
+      updateHeaderBadge();
+      renderCategoryCheckboxes();
+      updateAvailableCount();
+      renderHistorySummary();
+      setCloudMessage("✅ 雲端資料已下載並套用。最後更新時間：" + new Date(data.updated_at).toLocaleString(), false);
+    }
+
+    function cloudAutoPush(reason) {
+      if (cloudClient && cloudUser && navigator.onLine) {
+        cloudSyncPush().catch(err => setCloudMessage(reason + "，但自動同步失敗：" + err.message, true));
+      }
+    }
+
+    // ==================== PWA / 離線啟動 ====================
+    async function registerServiceWorker() {
+      if (!("serviceWorker" in navigator) || !/^https?:$/.test(location.protocol)) return;
+      try {
+        await navigator.serviceWorker.register("./service-worker.js");
+      } catch (e) {
+        console.warn("Service worker 註冊失敗", e);
+      }
+    }
+  </script>
+</body>
+</html>
