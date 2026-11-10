@@ -21,7 +21,7 @@
     body { padding-bottom: env(safe-area-inset-bottom); }
     button, input, textarea, select { touch-action: manipulation; }
     button { min-height: 40px; }
-    input, textarea { font-size: 16px; }
+    input, textarea, select { font-size: 16px; }
     @media (max-width: 640px) {
       header { position: sticky; }
       header h1 { font-size: 15px; line-height: 1.35; }
@@ -64,7 +64,7 @@
       <div class="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h2 class="font-bold text-slate-900">☁️ 電腦 / iPhone 雲端同步</h2>
-          <p class="text-xs text-slate-500 mt-1">登入同一帳號後，可同步題庫與測驗成績</p>
+          <p class="text-xs text-slate-500 mt-1">登入同一帳號後，可同步題庫、歷次錯題本與測驗成績</p>
         </div>
         <span id="cloudStatusBadge" class="text-xs rounded-full px-3 py-1.5 bg-slate-100 text-slate-600">尚未設定雲端</span>
       </div>
@@ -99,7 +99,6 @@
       <p id="historySummary" class="text-xs text-slate-500"></p>
     </section>
 
-
     <!-- ==================== 1. 設定與章節選擇畫面 ==================== -->
     <section id="setupScreen" class="space-y-6">
       
@@ -112,11 +111,70 @@
         <button onclick="openImportModal()" class="shrink-0 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-4 py-2 rounded-lg shadow">立即重新匯入 PDF</button>
       </div>
 
+      <!-- ==================== 新增：歷次錯題專區（錯題本） ==================== -->
+      <div id="wrongBankSection" class="bg-white rounded-2xl shadow-sm border-2 border-rose-200 p-5 md:p-6">
+        <div class="flex flex-wrap justify-between items-start gap-3 pb-4 border-b border-rose-100">
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="bg-rose-600 text-white text-xs font-black px-2.5 py-1 rounded-lg">錯題本</span>
+              <h2 class="text-lg font-bold text-slate-900">📕 歷次錯題專區（自動記錄寫錯題目）</h2>
+            </div>
+            <p class="text-xs text-slate-500 mt-1">每次練習或測驗中答錯的題目會自動收錄於此，方便針對弱點反覆練習</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <span id="wrongBankCountBadge" class="text-sm font-black bg-rose-50 text-rose-700 border border-rose-200 px-3.5 py-1.5 rounded-full">目前累計：0 題</span>
+          </div>
+        </div>
+
+        <!-- 錯題操作與練習按鈕區 -->
+        <div class="mt-4 flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center justify-between gap-3">
+          <div class="flex flex-wrap gap-2">
+            <button id="practiceAllWrongBtn" onclick="startWrongQuestionsQuiz('all')" class="bg-rose-600 hover:bg-rose-700 disabled:bg-slate-200 disabled:text-slate-400 text-white font-bold px-5 py-2.5 rounded-xl shadow-sm transition text-sm">
+              🎯 練習全部錯題
+            </button>
+            <button id="practiceCustomWrongBtn" onclick="startWrongQuestionsQuiz('custom')" class="bg-rose-50 hover:bg-rose-100 disabled:bg-slate-100 disabled:text-slate-400 disabled:border-slate-200 text-rose-700 border border-rose-300 font-bold px-4 py-2.5 rounded-xl transition text-sm">
+              🎲 依下方設定題數抽測錯題
+            </button>
+          </div>
+
+          <div class="flex flex-wrap items-center gap-3">
+            <label class="flex items-center gap-1.5 text-xs font-semibold text-slate-600 cursor-pointer select-none">
+              <input type="checkbox" id="autoRemoveWrongCheckbox" onchange="saveAutoRemoveSetting()" class="w-4 h-4 text-rose-600 rounded focus:ring-rose-500">
+              <span>練習錯題答對後自動從錯題本移除</span>
+            </label>
+            <button id="clearWrongBankBtn" onclick="clearAllWrongQuestions()" class="text-xs text-slate-400 hover:text-rose-600 font-semibold px-2 py-1 rounded">
+              🗑️ 清空全部錯題
+            </button>
+          </div>
+        </div>
+
+        <!-- 展開檢視錯題清單 -->
+        <details id="wrongBankDetails" class="mt-4 border-t border-slate-100 pt-3">
+          <summary class="cursor-pointer text-sm font-bold text-rose-700 hover:text-rose-800 select-none">
+            📋 點此展開查看已記錄的錯題清單與答案解析
+          </summary>
+          <div class="mt-3 space-y-3">
+            <div class="flex flex-wrap items-center justify-between gap-2 bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+              <div class="flex items-center gap-2 text-xs">
+                <span class="font-bold text-slate-600">篩選章節：</span>
+                <select id="wrongCategoryFilter" onchange="renderWrongQuestionsList()" class="border border-slate-300 rounded-lg px-2.5 py-1 text-xs bg-white font-semibold text-slate-700">
+                  <option value="ALL">全部章節</option>
+                </select>
+              </div>
+              <button onclick="startFilteredWrongQuiz()" class="text-xs bg-rose-600 hover:bg-rose-700 text-white font-bold px-3 py-1.5 rounded-lg">
+                練習目前篩選章節的錯題
+              </button>
+            </div>
+            <div id="wrongQuestionsListContainer" class="space-y-3 max-h-[60vh] overflow-y-auto pr-1"></div>
+          </div>
+        </details>
+      </div>
+
       <!-- 1. 選擇練習項目 -->
       <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 md:p-6">
         <div class="flex flex-wrap justify-between items-center gap-2 mb-4 pb-3 border-b border-slate-100">
           <div>
-            <h2 class="text-lg font-bold text-slate-900">1. 選擇要練習的項目（可複選）</h2>
+            <h2 class="text-lg font-bold text-slate-900">1. 選擇要練習的章節項目（可複選）</h2>
             <p class="text-xs text-slate-500 mt-0.5">勾選您想測驗的章節，右上角顯示該章節目前的題目數量</p>
           </div>
           <div class="flex space-x-2">
@@ -181,7 +239,7 @@
             ✓ 已啟用「選項隨機洗牌」：每次出題 (1)(2)(3)(4) 選項皆會隨機重新排列，避免只背答案位置。
           </div>
           <button onclick="startQuiz()" class="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-8 py-3 rounded-xl shadow-md hover:shadow-lg transition text-base">
-            開始答題練習 →
+            開始章節答題練習 →
           </button>
         </div>
       </div>
@@ -194,7 +252,8 @@
         <button onclick="confirmExitQuiz()" class="text-xs font-semibold text-slate-500 hover:text-slate-800 flex items-center gap-1">
           ← 返回重選項目
         </button>
-        <div class="flex items-center gap-3">
+        <div class="flex items-center gap-2 flex-wrap">
+          <span id="quizSourceBadge" class="hidden text-xs font-bold bg-rose-100 text-rose-800 px-2.5 py-1 rounded-full">📕 錯題本練習</span>
           <span id="currentCategoryBadge" class="text-xs font-bold bg-indigo-100 text-indigo-800 px-3 py-1 rounded-full">章節名稱</span>
           <span class="text-sm font-bold text-slate-700">第 <span id="currentIndexText" class="text-indigo-600 text-lg">1</span> / <span id="totalQuizCountText">20</span> 題</span>
         </div>
@@ -266,7 +325,7 @@
             只練習本回錯題
           </button>
           <button onclick="backToSetup()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-6 py-2.5 rounded-xl transition text-sm">
-            返回首頁重新選擇項目
+            返回首頁（查看錯題本）
           </button>
         </div>
       </div>
@@ -355,7 +414,7 @@
       "職業災害調查處理與統計"
     ];
 
-    // 內建代表性題庫（每個章節預載代表題，匯入 PDF 後即擴充至 860+ 題）
+    // 內建代表性題庫
     const DEFAULT_QUESTIONS = [
       { category: "企業經營風險與安全衛生", origNum: 1, q: "達成失能傷害平均在0.13以下，是職業安全衛生管理計畫中哪一項？", options: ["基本方針", "實施細目", "計畫目標", "預定進度"], ans: 2 },
       { category: "企業經營風險與安全衛生", origNum: 2, q: "下列何者非意外災害發生的基本原因？", options: ["未提供安全設備", "承攬商管理不良", "安全衛生管理不善", "危害確認不足"], ans: 0 },
@@ -383,9 +442,13 @@
 
     const STORAGE_KEY = "osh_supervisor_quiz_db_v3";
     const HISTORY_KEY = "osh_supervisor_quiz_history_v1";
+    const WRONG_DB_KEY = "osh_supervisor_wrong_db_v1";
+    const AUTO_REMOVE_WRONG_KEY = "osh_supervisor_auto_remove_wrong_v1";
     const CLOUD_CONFIG_KEY = "osh_supervisor_cloud_config_v1";
+
     let questionDB = [];
     let quizHistory = [];
+    let wrongDB = [];
     let cloudClient = null;
     let cloudUser = null;
     let selectedCategories = new Set(STANDARD_CATEGORIES);
@@ -394,16 +457,30 @@
     let currentQuizList = [];
     let currentQuestionIndex = 0;
     let quizMode = "practice";
+    let isPracticingWrongBank = false;
 
     // ==================== 初始化載入 ====================
     window.addEventListener("DOMContentLoaded", () => {
       loadDatabase();
       loadQuizHistory();
+      loadWrongDB();
       renderCategoryCheckboxes();
       updateAvailableCount();
+      renderWrongSection();
       loadCloudConfig();
       registerServiceWorker();
     });
+
+    function getQuestionKey(qObj) {
+      // 完整題幹、選項與正解納入鍵值，避免只取前 35 字造成題目碰撞。
+      const normalize = value => String(value ?? "").normalize("NFKC").replace(/\s+/g, " ").trim();
+      const identity = [
+        normalize(qObj.category), normalize(qObj.origNum), normalize(qObj.q),
+        ...(Array.isArray(qObj.options) ? qObj.options.map(normalize) : []),
+        normalize(qObj.ans)
+      ];
+      return identity.map(value => encodeURIComponent(value)).join("|");
+    }
 
     function loadDatabase() {
       try {
@@ -421,10 +498,72 @@
       updateHeaderBadge();
     }
 
+    function loadWrongDB() {
+      try {
+        const autoRem = localStorage.getItem(AUTO_REMOVE_WRONG_KEY);
+        const autoCheckbox = document.getElementById("autoRemoveWrongCheckbox");
+        if (autoCheckbox) autoCheckbox.checked = autoRem === "true";
+
+        const saved = localStorage.getItem(WRONG_DB_KEY);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) {
+            wrongDB = parsed;
+            return;
+          }
+        }
+        // 若首次升級尚無獨立錯題本，自動從過往歷史紀錄回溯匯入曾答錯的題目
+        backfillWrongDBFromHistory();
+      } catch (e) {
+        console.error("讀取錯題本失敗", e);
+        wrongDB = [];
+      }
+    }
+
+    function backfillWrongDBFromHistory() {
+      if (!Array.isArray(quizHistory) || quizHistory.length === 0) return;
+      const map = new Map();
+      quizHistory.forEach(h => {
+        if (Array.isArray(h.wrongQuestions)) {
+          h.wrongQuestions.forEach(wq => {
+            const matched = questionDB.find(q => q.category === wq.category && q.origNum === wq.origNum && q.q === wq.q);
+            if (matched) {
+              const key = getQuestionKey(matched);
+              if (!map.has(key)) {
+                map.set(key, {
+                  key,
+                  category: matched.category,
+                  origNum: matched.origNum,
+                  q: matched.q,
+                  options: matched.options,
+                  ans: matched.ans,
+                  wrongCount: 1,
+                  lastWrongChoice: "過往測驗答錯",
+                  lastWrongAt: h.date || new Date().toISOString()
+                });
+              } else {
+                map.get(key).wrongCount += 1;
+              }
+            }
+          });
+        }
+      });
+      if (map.size > 0) {
+        wrongDB = Array.from(map.values());
+        persistLocalData();
+      }
+    }
+
+    function saveAutoRemoveSetting() {
+      const checked = document.getElementById("autoRemoveWrongCheckbox")?.checked || false;
+      localStorage.setItem(AUTO_REMOVE_WRONG_KEY, checked ? "true" : "false");
+    }
+
     function persistLocalData() {
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(questionDB));
         localStorage.setItem(HISTORY_KEY, JSON.stringify(quizHistory));
+        localStorage.setItem(WRONG_DB_KEY, JSON.stringify(wrongDB));
         return true;
       } catch (e) {
         console.error("本機儲存失敗", e);
@@ -445,7 +584,202 @@
       const el = document.getElementById("historySummary");
       if (!el) return;
       const avg = quizHistory.length ? Math.round(quizHistory.reduce((s, h) => s + (h.score || 0), 0) / quizHistory.length) : 0;
-      el.textContent = quizHistory.length ? `本機保存 ${quizHistory.length} 筆測驗紀錄，平均 ${avg} 分。登入後可同步到其他裝置。` : "目前尚無測驗紀錄。";
+      el.textContent = quizHistory.length ? `本機保存 ${quizHistory.length} 筆測驗紀錄，平均 ${avg} 分；錯題本累計 ${wrongDB.length} 題。` : "目前尚無測驗紀錄。";
+    }
+
+    // ==================== 錯題本記錄、移除與渲染邏輯 ====================
+    function recordWrongQuestion(quizItem) {
+      if (!quizItem || !quizItem.raw) return;
+      if (quizItem.userSelectedIdx === null) return;
+      const chosenOpt = quizItem.shuffledOptions[quizItem.userSelectedIdx];
+      if (!chosenOpt || chosenOpt.isCorrect) return;
+
+      const raw = quizItem.raw;
+      const key = getQuestionKey(raw);
+      const existingIdx = wrongDB.findIndex(w => w.key === key);
+
+      if (existingIdx !== -1) {
+        if (!quizItem.recordedWrongOnce) {
+          wrongDB[existingIdx].wrongCount = (wrongDB[existingIdx].wrongCount || 1) + 1;
+        }
+        wrongDB[existingIdx].lastWrongChoice = chosenOpt.text;
+        wrongDB[existingIdx].lastWrongAt = new Date().toISOString();
+        const updated = wrongDB.splice(existingIdx, 1)[0];
+        wrongDB.unshift(updated);
+      } else {
+        wrongDB.unshift({
+          key,
+          category: raw.category,
+          origNum: raw.origNum,
+          q: raw.q,
+          options: raw.options,
+          ans: raw.ans,
+          wrongCount: 1,
+          lastWrongChoice: chosenOpt.text,
+          lastWrongAt: new Date().toISOString()
+        });
+      }
+
+      quizItem.recordedWrongOnce = true;
+      persistLocalData();
+      renderWrongSection();
+      renderHistorySummary();
+      cloudAutoPush("新增/更新錯題");
+        }
+
+    function maybeAutoRemoveWrongQuestion(quizItem) {
+      const autoRemove = document.getElementById("autoRemoveWrongCheckbox")?.checked;
+      if (!autoRemove || !quizItem || !quizItem.raw) return;
+      if (quizItem.userSelectedIdx === null) return;
+      const chosenOpt = quizItem.shuffledOptions[quizItem.userSelectedIdx];
+      if (chosenOpt && chosenOpt.isCorrect) {
+        const key = getQuestionKey(quizItem.raw);
+        const beforeLen = wrongDB.length;
+        wrongDB = wrongDB.filter(w => w.key !== key);
+        if (wrongDB.length !== beforeLen) {
+          persistLocalData();
+          renderWrongSection();
+          renderHistorySummary();
+        }
+      }
+    }
+
+    function removeSingleWrongQuestion(key) {
+      wrongDB = wrongDB.filter(w => w.key !== key);
+      persistLocalData();
+      renderWrongSection();
+      renderHistorySummary();
+      cloudAutoPush("已更新錯題本");
+    }
+
+    function clearAllWrongQuestions() {
+      if (wrongDB.length === 0) return;
+      if (!confirm(`確定要清空全部 ${wrongDB.length} 題錯題紀錄嗎？`)) return;
+      wrongDB = [];
+      persistLocalData();
+      renderWrongSection();
+      renderHistorySummary();
+      cloudAutoPush("已清空錯題本");
+    }
+
+    function renderWrongSection() {
+      const countBadge = document.getElementById("wrongBankCountBadge");
+      const allBtn = document.getElementById("practiceAllWrongBtn");
+      const customBtn = document.getElementById("practiceCustomWrongBtn");
+      const filterSelect = document.getElementById("wrongCategoryFilter");
+
+      if (countBadge) countBadge.textContent = `目前累計：${wrongDB.length} 題`;
+      if (allBtn) {
+        allBtn.disabled = wrongDB.length === 0;
+        allBtn.textContent = wrongDB.length > 0 ? `🎯 練習全部錯題 (${wrongDB.length} 題)` : "🎯 練習全部錯題 (目前無錯題)";
+      }
+      if (customBtn) {
+        customBtn.disabled = wrongDB.length === 0;
+      }
+
+      // 更新章節下拉篩選器
+      if (filterSelect) {
+        const currentVal = filterSelect.value || "ALL";
+        const catCounts = {};
+        wrongDB.forEach(w => {
+          catCounts[w.category] = (catCounts[w.category] || 0) + 1;
+        });
+
+        filterSelect.innerHTML = `<option value="ALL">全部章節 (${wrongDB.length} 題)</option>`;
+        STANDARD_CATEGORIES.forEach(cat => {
+          if (catCounts[cat]) {
+            const opt = document.createElement("option");
+            opt.value = cat;
+            opt.textContent = `${cat} (${catCounts[cat]} 題)`;
+            filterSelect.appendChild(opt);
+          }
+        });
+        if ([...filterSelect.options].some(o => o.value === currentVal)) {
+          filterSelect.value = currentVal;
+        }
+      }
+
+      renderWrongQuestionsList();
+    }
+
+    function renderWrongQuestionsList() {
+      const container = document.getElementById("wrongQuestionsListContainer");
+      const filterSelect = document.getElementById("wrongCategoryFilter");
+      if (!container) return;
+      const selectedCat = filterSelect ? filterSelect.value : "ALL";
+      const filtered = selectedCat === "ALL" ? wrongDB : wrongDB.filter(w => w.category === selectedCat);
+      container.replaceChildren();
+
+      if (!filtered.length) {
+        const empty = document.createElement("div");
+        empty.className = "text-center py-6 text-slate-400 text-sm bg-slate-50 rounded-xl border border-dashed border-slate-200";
+        empty.textContent = "目前沒有錯題紀錄，開始練習後若有答錯的題目會自動收錄在這裡！";
+        container.appendChild(empty);
+        return;
+      }
+
+      filtered.forEach((item, idx) => {
+        const card = document.createElement("div");
+        card.className = "p-4 rounded-xl border border-rose-200 bg-rose-50/30 space-y-2";
+        const top = document.createElement("div");
+        top.className = "flex flex-wrap justify-between items-center gap-2";
+        const labels = document.createElement("div");
+        labels.className = "flex items-center gap-2";
+
+        const category = document.createElement("span");
+        category.className = "text-xs font-bold px-2.5 py-0.5 rounded-full bg-indigo-100 text-indigo-800";
+        category.textContent = `${item.category || "未分類"} (#${item.origNum ?? "-"})`;
+        const count = document.createElement("span");
+        count.className = "text-xs font-bold px-2 py-0.5 rounded-full bg-rose-100 text-rose-700";
+        count.textContent = `累計答錯 ${item.wrongCount || 1} 次`;
+        labels.append(category, count);
+
+        const remove = document.createElement("button");
+        remove.type = "button";
+        remove.className = "text-xs bg-white hover:bg-emerald-50 text-slate-600 hover:text-emerald-700 border border-slate-200 font-semibold px-2.5 py-1 rounded-lg transition";
+        remove.textContent = "✓ 已熟練（移除此題）";
+        remove.addEventListener("click", () => removeSingleWrongQuestion(item.key));
+        top.append(labels, remove);
+
+        const question = document.createElement("div");
+        question.className = "font-bold text-slate-900 text-sm md:text-base";
+        question.textContent = `${idx + 1}. ${item.q || ""}`;
+
+        const options = document.createElement("div");
+        options.className = "grid grid-cols-1 sm:grid-cols-2 gap-1.5 pt-1";
+        (Array.isArray(item.options) ? item.options : []).forEach((value, optionIndex) => {
+          const option = document.createElement("div");
+          const correct = optionIndex === item.ans;
+          option.className = `text-xs px-2.5 py-1.5 rounded-lg border ${correct ? "bg-emerald-50 border-emerald-300 text-emerald-900 font-bold" : "bg-white border-slate-200 text-slate-600"}`;
+          option.textContent = `(${optionIndex + 1}) ${value}${correct ? " ✓ 正確答案" : ""}`;
+          options.appendChild(option);
+        });
+
+        const lastChoice = document.createElement("div");
+        lastChoice.className = "text-xs text-rose-600 pt-1";
+        lastChoice.textContent = `上次誤選答案：${item.lastWrongChoice || "未記錄"}`;
+        card.append(top, question, options, lastChoice);
+        container.appendChild(card);
+      });
+    }
+
+    function startWrongQuestionsQuiz(countMode) {
+      if (wrongDB.length === 0) {
+        alert("目前錯題本沒有題目喔！");
+        return;
+      }
+      launchQuizFromPool(wrongDB, countMode, true);
+    }
+
+    function startFilteredWrongQuiz() {
+      const filterSelect = document.getElementById("wrongCategoryFilter");
+      const selectedCat = filterSelect ? filterSelect.value : "ALL";
+      const pool = selectedCat === "ALL" ? wrongDB : wrongDB.filter(w => w.category === selectedCat);
+      if (pool.length === 0) {
+        alert("此篩選章節目前沒有錯題！");
+        return;
+      }
+      launchQuizFromPool(pool, "all", true);
     }
 
     function setCloudMessage(message, isError=false) {
@@ -467,21 +801,19 @@
         notice.innerHTML = `
           <div>
             <h2 class="font-bold text-emerald-950 text-sm md:text-base">✅ 已載入題庫（共 ${questionDB.length} 題）！</h2>
-            <p class="text-xs text-emerald-800 mt-0.5">題庫已保存在此裝置的瀏覽器中，請直接在下方勾選想練習的章節開始測驗。</p>
+            <p class="text-xs text-emerald-800 mt-0.5">題庫已保存在此裝置的瀏覽器中，請直接在下方選擇「歷次錯題專區」或勾選章節開始測驗。</p>
           </div>
           <button onclick="openImportModal()" class="shrink-0 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3.5 py-2 rounded-lg">重新匯入/檢視統計</button>
         `;
       }
     }
 
-    // ==================== 核心修復：100% 精準章節切割與題庫解析引擎 ====================
-    // 針對《甲業題庫.pdf》設計的章節錨點規則：每個章節標題後面必定緊接著第 1 題 "(1~4)1."
+    // ==================== 100% 精準章節切割與題庫解析引擎 ====================
     const SECTION_MARKERS = [
       { category: "企業經營風險與安全衛生", regex: /企業經營風險與安全衛生(?:\s*\(含組織協調與溝通\))?\s*(?=\([1-4I]\)\s*1\.)/ },
       { category: "職業安全相關法規", regex: /職業安全(?:衛生)?相關法規\s*(?=\([1-4I]\)\s*1\.)/ },
       { category: "職業安全衛生概論", regex: /職業安全衛生概論\s*(?=\([1-4I]\)\s*1\.)/ },
       { category: "職業安全衛生管理系統介紹", regex: /職業安全衛生管理系統介紹\s*(?=\([1-4I]\)\s*1\.)/ },
-      // PDF 第30頁有獨立的「風險評估」章節(共39題)，自動歸入「職業安全衛生管理系統介紹」或「企業經營風險與安全衛生」
       { category: "職業安全衛生管理系統介紹", regex: /風險評估\s*(?=\([1-4I]\)\s*1\.)/ },
       { category: "承攬管理", regex: /承攬管理\s*(?=\([1-4I]\)\s*1\.)/ },
       { category: "採購管理", regex: /採購管理\s*(?=\([1-4I]\)\s*1\.)/ },
@@ -498,7 +830,6 @@
     ];
 
     function parseFullPdfText(rawText) {
-      // 1. 清理全形括號、頁首與頁碼雜訊
       let cleaned = rawText
         .replace(/（/g, "(")
         .replace(/）/g, ")")
@@ -508,7 +839,6 @@
         .replace(/\r?\n/g, " ")
         .replace(/\s+/g, " ");
 
-      // 2. 定位所有章節標題在全文中的起始座標
       let foundSections = [];
       for (const marker of SECTION_MARKERS) {
         const match = marker.regex.exec(cleaned);
@@ -521,10 +851,8 @@
         }
       }
 
-      // 依照在 PDF 中出現的先後順序排列
       foundSections.sort((a, b) => a.startIndex - b.startIndex);
 
-      // 若使用者只貼上單一章節或部分題目，保底使用預設分類
       if (foundSections.length === 0) {
         foundSections.push({
           category: "企業經營風險與安全衛生",
@@ -535,13 +863,11 @@
 
       let parsedQuestions = [];
 
-      // 3. 逐一章節切出區塊並解析該章節內的所有題目
       for (let s = 0; s < foundSections.length; s++) {
         const currentSec = foundSections[s];
         const nextSecStart = (s + 1 < foundSections.length) ? foundSections[s + 1].startIndex : cleaned.length;
         const sectionText = cleaned.slice(currentSec.contentStart, nextSecStart);
 
-        // 找出該章節內所有形如 (3)15. 或 (1) 2. 的題目開頭
         const qHeaderRegex = /\(([1-4I])\)\s*(\d{1,3})\s*[\.、]?\s*/g;
         let matches = [];
         let m;
@@ -549,12 +875,10 @@
           const ansChar = m[1] === "I" ? "1" : m[1];
           const qNum = parseInt(m[2], 10);
 
-          // 排除題目中間像 "(1) 5 (2) 6" 的選項被誤判為題號：
-          // 檢查題號是否合理遞增（允許偶爾跳號如 255 -> 257）
           if (matches.length > 0) {
             const prevNum = matches[matches.length - 1].qNum;
             if (qNum < prevNum || qNum > prevNum + 5) {
-              continue; 
+              continue;
             }
           }
 
@@ -566,16 +890,13 @@
           });
         }
 
-        // 4. 解析每一題的題幹與 (1)(2)(3)(4) 選項
         for (let i = 0; i < matches.length; i++) {
           const curQ = matches[i];
           const nextQStart = (i + 1 < matches.length) ? matches[i + 1].qStart : sectionText.length;
           let block = sectionText.slice(curQ.bodyStart, nextQStart).trim();
 
-          // 移除夾在題尾的單獨頁碼 (例如 "...(4)服務 1")
           block = block.replace(/\s+\d{1,2}\s*$/, "");
 
-          // 尋找最後一組 (1)...(2)...(3)...(4)...
           const idx1 = block.lastIndexOf("(1)");
           const idx2 = block.indexOf("(2)", idx1);
           const idx3 = block.indexOf("(3)", idx2);
@@ -761,7 +1082,7 @@
       }
     }
 
-    // ==================== Fisher-Yates 洗牌演算法（題目與選項隨機排序） ====================
+    // ==================== Fisher-Yates 洗牌演算法 ====================
     function shuffleArray(arr) {
       const copy = [...arr];
       for (let i = copy.length - 1; i > 0; i--) {
@@ -778,15 +1099,26 @@
         alert("請至少勾選一個有題目的章節項目！");
         return;
       }
+      launchQuizFromPool(pool, "custom", false);
+    }
 
-      let reqCount = parseInt(document.getElementById("questionCountInput").value, 10);
-      if (isNaN(reqCount) || reqCount < 1) reqCount = 10;
-      reqCount = Math.min(reqCount, pool.length);
+    function launchQuizFromPool(pool, countMode, fromWrongBank = false) {
+      isPracticingWrongBank = fromWrongBank;
+      let reqCount = pool.length;
+      if (countMode === "custom") {
+        reqCount = parseInt(document.getElementById("questionCountInput").value, 10);
+        if (isNaN(reqCount) || reqCount < 1) reqCount = 10;
+        reqCount = Math.min(reqCount, pool.length);
+      }
 
       const modeRadio = document.querySelector('input[name="quizMode"]:checked');
       quizMode = modeRadio ? modeRadio.value : "practice";
 
-      // 隨機抽取指定題數，並對每一題的 (1)(2)(3)(4) 選項重新隨機洗牌
+      const sourceBadge = document.getElementById("quizSourceBadge");
+      if (sourceBadge) {
+        sourceBadge.classList.toggle("hidden", !fromWrongBank);
+      }
+
       const shuffledPool = shuffleArray(pool).slice(0, reqCount);
       currentQuizList = shuffledPool.map(item => buildShuffledQuestion(item));
 
@@ -797,6 +1129,7 @@
 
       renderCurrentQuestion();
       renderJumpGrid();
+      window.scrollTo({ top: 0, behavior: "smooth" });
     }
 
     function buildShuffledQuestion(rawItem) {
@@ -812,7 +1145,8 @@
         origNum: rawItem.origNum,
         q: rawItem.q,
         shuffledOptions: shuffleArray(optionObjs),
-        userSelectedIdx: null
+        userSelectedIdx: null,
+        recordedWrongOnce: false
       };
     }
 
@@ -845,7 +1179,6 @@
               btnStyle = "bg-slate-50 border-slate-200 text-slate-400 opacity-75";
             }
           } else {
-            // 模擬考模式：只標示已選，不洩漏答案
             if (isSelected) {
               btnStyle = "bg-indigo-50 border-indigo-600 text-indigo-950 font-bold ring-2 ring-indigo-500/30";
             }
@@ -855,14 +1188,22 @@
         btn.className = `option-btn w-full text-left p-4 rounded-xl border-2 flex items-center justify-between gap-3 ${btnStyle}`;
         btn.onclick = () => selectOption(idx);
 
-        btn.innerHTML = `
-          <div class="flex items-center gap-3">
-            <span class="shrink-0 w-7 h-7 rounded-lg bg-slate-100 border border-slate-300 flex items-center justify-center text-xs font-bold text-slate-700">(${idx + 1})</span>
-            <span class="text-base">${opt.text}</span>
-          </div>
-          ${hasAnswered && quizMode === "practice" && opt.isCorrect ? '<span class="text-xs font-bold bg-emerald-600 text-white px-2.5 py-1 rounded-full shrink-0">✓ 正確答案</span>' : ''}
-          ${hasAnswered && quizMode === "practice" && isSelected && !opt.isCorrect ? '<span class="text-xs font-bold bg-rose-600 text-white px-2.5 py-1 rounded-full shrink-0">✗ 您的選擇</span>' : ''}
-        `;
+        const content = document.createElement("div");
+        content.className = "flex items-center gap-3";
+        const number = document.createElement("span");
+        number.className = "shrink-0 w-7 h-7 rounded-lg bg-slate-100 border border-slate-300 flex items-center justify-center text-xs font-bold text-slate-700";
+        number.textContent = `(${idx + 1})`;
+        const optionText = document.createElement("span");
+        optionText.className = "text-base";
+        optionText.textContent = opt.text;
+        content.append(number, optionText);
+        btn.appendChild(content);
+        if (hasAnswered && quizMode === "practice" && (opt.isCorrect || (isSelected && !opt.isCorrect))) {
+          const tag = document.createElement("span");
+          tag.className = `text-xs font-bold ${opt.isCorrect ? "bg-emerald-600" : "bg-rose-600"} text-white px-2.5 py-1 rounded-full shrink-0`;
+          tag.textContent = opt.isCorrect ? "✓ 正確答案" : "✗ 您的選擇";
+          btn.appendChild(tag);
+        }
         container.appendChild(btn);
       });
 
@@ -874,10 +1215,10 @@
         feedbackBox.classList.remove("hidden");
         if (chosen.isCorrect) {
           feedbackBox.className = "mt-5 p-4 rounded-xl border bg-emerald-50 border-emerald-200 text-emerald-900 text-sm";
-          feedbackBox.innerHTML = `<strong>🎉 答對了！</strong> 正確答案為：<strong>${correctOpt.text}</strong>（原 PDF 選項為 (${correctOpt.origOptionNumber})）`;
+          feedbackBox.textContent = `🎉 答對了！正確答案為：${correctOpt.text}（原 PDF 選項為 (${correctOpt.origOptionNumber})）`;
         } else {
           feedbackBox.className = "mt-5 p-4 rounded-xl border bg-rose-50 border-rose-200 text-rose-900 text-sm";
-          feedbackBox.innerHTML = `<strong>❌ 答錯了！</strong> 正確答案應為：<strong>${correctOpt.text}</strong>（原 PDF 選項為 (${correctOpt.origOptionNumber})）`;
+          feedbackBox.textContent = `❌ 答錯了！（已自動收入錯題本）正確答案應為：${correctOpt.text}（原 PDF 選項為 (${correctOpt.origOptionNumber})）`;
         }
       } else {
         feedbackBox.classList.add("hidden");
@@ -900,6 +1241,17 @@
     function selectOption(idx) {
       const item = currentQuizList[currentQuestionIndex];
       item.userSelectedIdx = idx;
+
+      // 練習模式下，點選錯選項立即寫入錯題本
+      if (quizMode === "practice") {
+        const chosen = item.shuffledOptions[idx];
+        if (chosen && !chosen.isCorrect) {
+          recordWrongQuestion(item);
+        } else if (chosen && chosen.isCorrect) {
+          maybeAutoRemoveWrongQuestion(item);
+        }
+      }
+
       renderCurrentQuestion();
     }
 
@@ -948,8 +1300,13 @@
     function finishQuiz() {
       let correct = 0;
       currentQuizList.forEach(item => {
-        if (item.userSelectedIdx !== null && item.shuffledOptions[item.userSelectedIdx].isCorrect) {
-          correct++;
+        if (item.userSelectedIdx !== null) {
+          if (item.shuffledOptions[item.userSelectedIdx].isCorrect) {
+            correct++;
+            maybeAutoRemoveWrongQuestion(item);
+          } else {
+            recordWrongQuestion(item);
+          }
         }
       });
 
@@ -960,11 +1317,22 @@
         category: item.category, origNum: item.origNum, q: item.q,
         correctAnswer: (item.shuffledOptions.find(o => o.isCorrect) || {}).text || ""
       }));
-      quizHistory.unshift({ date: new Date().toISOString(), score, correct, wrong, total, mode: quizMode, wrongQuestions });
+
+      quizHistory.unshift({
+        date: new Date().toISOString(),
+        score,
+        correct,
+        wrong,
+        total,
+        mode: quizMode,
+        wrongQuestions,
+        wrong_db_backup: wrongDB
+      });
       quizHistory = quizHistory.slice(0, 100);
       persistLocalData();
+      renderWrongSection();
       renderHistorySummary();
-      cloudAutoPush("測驗成績已保存");
+      cloudAutoPush("測驗成績與錯題本已保存");
 
       document.getElementById("scoreValue").textContent = score;
       document.getElementById("correctCountText").textContent = correct;
@@ -1038,10 +1406,11 @@
       document.getElementById("quizScreen").classList.add("hidden");
       document.getElementById("resultScreen").classList.add("hidden");
       document.getElementById("setupScreen").classList.remove("hidden");
+      renderWrongSection();
     }
 
     function confirmExitQuiz() {
-      if (confirm("確定要結束目前的練習並返回首頁嗎？")) {
+      if (confirm("確定要結束目前的練習並返回首頁嗎？（已答錯的題目會保留在錯題本中）")) {
         backToSetup();
       }
     }
@@ -1062,10 +1431,11 @@
     function loadCloudConfig() {
       try {
         const cfg = JSON.parse(localStorage.getItem(CLOUD_CONFIG_KEY) || "{}");
-        document.getElementById("supabaseUrlInput").value = cfg.url || "";
+        const defaultUrl = cfg.url || "https://ggeccsgvoaegjwtknbqz.supabase.co";
+        document.getElementById("supabaseUrlInput").value = defaultUrl;
         document.getElementById("supabaseKeyInput").value = cfg.key || "";
-        if (cfg.url && cfg.key) {
-          initCloudClient(cfg.url, cfg.key);
+        if (defaultUrl && cfg.key) {
+          initCloudClient(defaultUrl, cfg.key);
         } else {
           setCloudBadge("尚未設定雲端");
         }
@@ -1081,7 +1451,7 @@
       }
       localStorage.setItem(CLOUD_CONFIG_KEY, JSON.stringify({url, key}));
       initCloudClient(url, key);
-      setCloudMessage("雲端設定已保存在此裝置。接著請註冊或登入同一個帳號。若要在另一台裝置使用，需在另一台裝置也填入相同設定。", false);
+      setCloudMessage("雲端設定已保存在此裝置。接著請註冊或登入同一個帳號。", false);
     }
 
     function initCloudClient(url, key) {
@@ -1109,7 +1479,7 @@
     function updateCloudAuthUI() {
       if (cloudUser) {
         setCloudBadge("已登入：" + (cloudUser.email || "雲端帳號"), true);
-        setCloudMessage("已登入雲端。可手動下載雲端資料，或上傳本機題庫與測驗紀錄。題庫匯入及交卷後會嘗試自動上傳。", false);
+        setCloudMessage("已登入雲端。可手動下載雲端資料，或上傳本機題庫、錯題本與測驗紀錄。", false);
       } else if (cloudClient) {
         setCloudBadge("雲端已設定，尚未登入");
       }
@@ -1142,7 +1512,7 @@
       if (error) { setCloudMessage("登入失敗：" + error.message, true); return; }
       cloudUser = data.user;
       updateCloudAuthUI();
-      setCloudMessage("登入成功。為避免覆蓋資料，請先選擇「從雲端下載」或「上傳本機資料」。", false);
+      setCloudMessage("登入成功。請選擇「從雲端下載」或「上傳本機資料」。", false);
     }
 
     async function cloudSignOut() {
@@ -1156,39 +1526,71 @@
 
     async function cloudSyncPush() {
       if (!cloudClient || !cloudUser) { setCloudMessage("請先設定雲端並登入。", true); return; }
-      setCloudMessage("正在上傳題庫與測驗紀錄…");
+      setCloudMessage("正在上傳題庫、錯題本與測驗紀錄…");
       const payload = {
         user_id: cloudUser.id,
         question_db: questionDB,
+        wrong_db: wrongDB,
         quiz_history: quizHistory,
         updated_at: new Date().toISOString()
       };
       const {error} = await cloudClient.from("osh_quiz_data").upsert(payload, {onConflict: "user_id"});
       if (error) { setCloudMessage("上傳失敗：" + error.message + "。請確認已執行附贈 SQL 並啟用資料表權限。", true); return; }
-      setCloudMessage("✅ 上傳成功！題庫 " + questionDB.length + " 題、測驗紀錄 " + quizHistory.length + " 筆已同步至雲端。", false);
+      setCloudMessage(`✅ 上傳成功！題庫 ${questionDB.length} 題、錯題本 ${wrongDB.length} 題、測驗紀錄 ${quizHistory.length} 筆已同步至雲端。`, false);
     }
 
     async function cloudSyncPull() {
       if (!cloudClient || !cloudUser) { setCloudMessage("請先設定雲端並登入。", true); return; }
-      if (!confirm("從雲端下載會覆蓋目前這台裝置的題庫與測驗紀錄，確定繼續嗎？建議先上傳本機資料備份。")) return;
+      if (!confirm("從雲端下載會覆蓋目前這台裝置的題庫、錯題本與測驗紀錄，確定繼續嗎？")) return;
       setCloudMessage("正在下載雲端資料…");
-      const {data, error} = await cloudClient.from("osh_quiz_data").select("question_db,quiz_history,updated_at").eq("user_id", cloudUser.id).maybeSingle();
+      const {data, error} = await cloudClient.from("osh_quiz_data").select("question_db,wrong_db,quiz_history,updated_at").eq("user_id", cloudUser.id).maybeSingle();
       if (error) { setCloudMessage("下載失敗：" + error.message, true); return; }
       if (!data) { setCloudMessage("雲端尚無資料。請先按「上傳本機資料」建立第一份雲端備份。", false); return; }
       if (Array.isArray(data.question_db) && data.question_db.length) questionDB = data.question_db;
       quizHistory = Array.isArray(data.quiz_history) ? data.quiz_history : [];
+      if (Array.isArray(data.wrong_db)) {
+        wrongDB = data.wrong_db;
+      } else if (quizHistory.length > 0 && Array.isArray(quizHistory[0].wrong_db_backup)) {
+        // 舊版相容：錯題本曾暫存在第一筆測驗紀錄內。
+        wrongDB = quizHistory[0].wrong_db_backup;
+      } else {
+        wrongDB = [];
+        backfillWrongDBFromHistory();
+      }
       persistLocalData();
       updateHeaderBadge();
       renderCategoryCheckboxes();
       updateAvailableCount();
+      renderWrongSection();
       renderHistorySummary();
       setCloudMessage("✅ 雲端資料已下載並套用。最後更新時間：" + new Date(data.updated_at).toLocaleString(), false);
     }
 
+    let cloudPushTimer = null;
+    let cloudPushInFlight = false;
+    let cloudPushQueued = false;
+
     function cloudAutoPush(reason) {
-      if (cloudClient && cloudUser && navigator.onLine) {
-        cloudSyncPush().catch(err => setCloudMessage(reason + "，但自動同步失敗：" + err.message, true));
-      }
+      if (!cloudClient || !cloudUser || !navigator.onLine) return;
+      clearTimeout(cloudPushTimer);
+      cloudPushTimer = setTimeout(async () => {
+        if (cloudPushInFlight) {
+          cloudPushQueued = true;
+          return;
+        }
+        cloudPushInFlight = true;
+        try {
+          await cloudSyncPush();
+        } catch (err) {
+          setCloudMessage(`${reason}，但自動同步失敗：${err.message}`, true);
+        } finally {
+          cloudPushInFlight = false;
+          if (cloudPushQueued) {
+            cloudPushQueued = false;
+            cloudAutoPush("尚有資料待同步");
+          }
+        }
+      }, 1200);
     }
 
     // ==================== PWA / 離線啟動 ====================
