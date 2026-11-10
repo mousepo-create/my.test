@@ -105,10 +105,10 @@
       <!-- 提示橫幅 -->
       <div id="importNotice" class="bg-indigo-50 border-l-4 border-indigo-600 p-4 rounded-r-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h2 class="font-bold text-indigo-950 text-sm md:text-base">💡 已修復章節分類辨識引擎！</h2>
-          <p class="text-xs md:text-sm text-indigo-800 mt-0.5">如果您之前匯入的題目都擠在同一個分類，請點擊右上角「匯入完整 PDF 題庫」重新選擇一次 PDF 檔案，系統會嘗試依題庫章節標題分類，匯入後請檢查各章節題數。</p>
+          <h2 class="font-bold text-indigo-950 text-sm md:text-base">💡 請先匯入題庫！</h2>
+          <p class="text-xs md:text-sm text-indigo-800 mt-0.5">點擊右上角「匯入完整 PDF 題庫」選擇您的題庫檔案，系統會嘗試依題庫章節標題分類，匯入後請檢查各章節題數。</p>
         </div>
-        <button onclick="openImportModal()" class="shrink-0 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-4 py-2 rounded-lg shadow">立即重新匯入 PDF</button>
+        <button onclick="openImportModal()" class="shrink-0 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-4 py-2 rounded-lg shadow">立即匯入 PDF</button>
       </div>
 
       <!-- ==================== 新增：歷次錯題專區（錯題本） ==================== -->
@@ -183,7 +183,7 @@
           </div>
         </div>
 
-        <!-- 16大分類 Checkbox Grid -->
+        <!-- 17大分類 Checkbox Grid -->
         <div id="categoryGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5"></div>
 
         <div class="mt-4 pt-3 border-t border-slate-100 flex justify-between items-center text-sm">
@@ -357,7 +357,7 @@
         <!-- 方式 A：直接選擇 PDF 檔案 -->
         <div class="bg-indigo-50 border-2 border-dashed border-indigo-300 rounded-xl p-5 text-center">
           <div class="font-bold text-indigo-950 text-base mb-1">方法 A：直接選取您的《甲業題庫.pdf》檔案（最推薦）</div>
-          <p class="text-xs text-indigo-700 mb-3">系統會在您的瀏覽器內自動讀取全部 59 頁，並精準切分出 16 大章節題庫</p>
+          <p class="text-xs text-indigo-700 mb-3">系統會在您的瀏覽器內自動讀取全部 59 頁，並精準切分出 17 大章節題庫</p>
           <input type="file" id="pdfFileInput" accept="application/pdf" class="hidden" onchange="handlePdfUpload(event)">
           <button onclick="document.getElementById('pdfFileInput').click()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-5 py-2.5 rounded-xl shadow text-sm inline-flex items-center gap-2">
             📄 點此選擇 PDF 檔案自動解析
@@ -382,7 +382,7 @@
       </div>
 
       <div class="bg-slate-50 px-6 py-3 border-t border-slate-200 flex justify-between items-center">
-        <button onclick="resetToDefaultDB()" class="text-xs text-rose-600 hover:underline font-medium">清除快取並還原預設範例題</button>
+        <button onclick="resetToDefaultDB()" class="text-xs text-rose-600 hover:underline font-medium">清空所有題庫</button>
         <button onclick="closeImportModal()" class="bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold px-5 py-1.5 rounded-lg text-sm">關閉視窗</button>
       </div>
     </div>
@@ -394,51 +394,29 @@
       pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
     }
 
-    // ==================== 使用者指定的 16 大標準章節名稱 ====================
+    // ==================== 使用者指定的 17 大標準章節名稱 ====================
     const STANDARD_CATEGORIES = [
-      "企業經營風險與安全衛生",
+      "企業經營風險與安全衛生(含組織協調與溝通)",
       "職業安全相關法規",
       "職業安全衛生概論",
       "職業安全衛生管理系統介紹",
+      "風險評估",
       "承攬管理",
       "採購管理",
-      "緊急應變管理",
+      "緊急應變管理(含急救)",
       "墜落危害預防管理實務",
       "機械安全管理實務",
       "火災爆炸預防管理實務",
       "感電危害預防管理實務",
-      "倒塌崩塌危害預防管理實務",
-      "化學品危害預防管理實務",
-      "物理性危害預防管理實務",
+      "倒塌崩塌危害預防管理實務(含物體飛落、被撞危害預防)",
+      "化學性危害預防管理實務(含缺氧危害預防)",
+      "物理性危害預防管理實務(含人因危害預防)",
       "健康管理與健康促進",
       "職業災害調查處理與統計"
     ];
 
-    // 內建代表性題庫
-    const DEFAULT_QUESTIONS = [
-      { category: "企業經營風險與安全衛生", origNum: 1, q: "達成失能傷害平均在0.13以下，是職業安全衛生管理計畫中哪一項？", options: ["基本方針", "實施細目", "計畫目標", "預定進度"], ans: 2 },
-      { category: "企業經營風險與安全衛生", origNum: 2, q: "下列何者非意外災害發生的基本原因？", options: ["未提供安全設備", "承攬商管理不良", "安全衛生管理不善", "危害確認不足"], ans: 0 },
-      { category: "企業經營風險與安全衛生", origNum: 8, q: "下列何者為發揮安全衛生之功能的主要關鍵？", options: ["建立安全衛生管理計畫", "研議安全衛生教育訓練計畫", "良好溝通與協調", "研議各項安全衛生提案"], ans: 2 },
-      { category: "職業安全相關法規", origNum: 1, q: "職業安全衛生法之目的，在於保障工作者的：", options: ["生命財產", "賺錢", "勞資合諧", "安全與健康"], ans: 3 },
-      { category: "職業安全相關法規", origNum: 2, q: "依職業安全衛生法之規定，下列何者非屬「工作者」之定義？", options: ["承攬商", "其他受工作場所負責人指揮或監督從事勞動之人員", "自營作業者", "勞工"], ans: 0 },
-      { category: "職業安全相關法規", origNum: 29, q: "事業單位工作場所發生勞工死亡職業災害時，雇主應於幾小時內報告當地勞動檢查機構？", options: ["8", "36", "48", "72"], ans: 0 },
-      { category: "職業安全衛生概論", origNum: 1, q: "零災害運動的3大原則，通常不包括下列何者？", options: ["要求完美", "以零為目標", "先知先制", "全員參加"], ans: 0 },
-      { category: "職業安全衛生概論", origNum: 7, q: "下列何者為預防職業災害應優先考量之手段？", options: ["消除或取代危害發生源", "提供個人防護具", "教育訓練", "行政管理"], ans: 0 },
-      { category: "職業安全衛生管理系統介紹", origNum: 1, q: "職業安全衛生管理系統之主要架構運作，職業安全衛生活動的最高指導原則為下列何者？", options: ["職業安全衛生計畫", "職業安全衛生政策", "職業安全衛生方針", "職業安全衛生方案"], ans: 1 },
-      { category: "職業安全衛生管理系統介紹", origNum: 4, q: "FTA為下列何種評估方法之縮寫？", options: ["危害及可操作性分析", "失誤模式與影響分析", "初步危害分析", "故障樹分析"], ans: 3 },
-      { category: "承攬管理", origNum: 2, q: "依職業安全衛生法規定，二個以上之事業單位分別出資共同承攬時，防止職業災害之雇主責任應由誰負責？", options: ["出資較多的事業單位", "二事業單位一起負責", "勞工人數較多的事業單位", "此二事業單位互推一人為代表人"], ans: 3 },
-      { category: "採購管理", origNum: 1, q: "某家工廠對內部人員異動，導入新製程、新工作程序時，均會重新評估其對職業安全衛生管理產生的影響，並採取適當的預防措施，則該項管理措施稱為下列何者？", options: ["自動檢查", "採購管理", "變更管理", "承攬管理"], ans: 2 },
-      { category: "緊急應變管理", origNum: 1, q: "下列何者為燒傷急救口訣？", options: ["沖脫泡蓋送", "叫叫壓", "拉拉壓", "快狠準"], ans: 0 },
-      { category: "墜落危害預防管理實務", origNum: 1, q: "對於移動式施工架之使用，下列做法何者有誤？", options: ["攀爬施工架上下時，手足應確實抓緊及踏穩", "確認安全帶已勾掛妥實", "應注意腳底踏踩位置避免扭傷", "於結構物上突出之鐵件應予以拔除，釘入"], ans: 0 },
-      { category: "機械安全管理實務", origNum: 1, q: "輸送帶尾輪之清潔作業，較常發生下列何種災害？", options: ["物體飛落", "擦傷", "被撞", "被夾、被捲"], ans: 3 },
-      { category: "火災爆炸預防管理實務", origNum: 1, q: "金屬鋰、金屬鈉與金屬鉀等物質之保存方式，下列何者最佳？", options: ["儲存於石油醚中", "放置於空氣中", "放置於水中", "儲存於含水酒精中"], ans: 0 },
-      { category: "感電危害預防管理實務", origNum: 1, q: "對於感電災害之緊急應變，下列何者最優先進行？", options: ["CPR", "通報", "設法切斷電源", "搶救"], ans: 2 },
-      { category: "倒塌崩塌危害預防管理實務", origNum: 1, q: "為確保鋼筋儲存時之安全性，下列何者有誤？", options: ["應使用纜索等加以適當捆紮", "應遠離電源", "可加裝護套", "應盡可能堆高以節省空間"], ans: 3 },
-      { category: "化學品危害預防管理實務", origNum: 1, q: "下列何者較難進入人體肺泡區？", options: ["奈米微粒", "胸腔性微粒", "可呼吸性微粒", "氧氣"], ans: 1 },
-      { category: "物理性危害預防管理實務", origNum: 1, q: "暴露於下列何種環境溫度以上時，對人體開始較會有熱蓄積危害？", options: ["29℃", "27℃", "35℃", "31℃"], ans: 2 },
-      { category: "健康管理與健康促進", origNum: 1, q: "職業健康促進活動中，下列何者不屬推行健康生活範圍？", options: ["投資理財", "營養指導", "菸害防制", "體重管理"], ans: 0 },
-      { category: "職業災害調查處理與統計", origNum: 1, q: "職業災害統計中對於暫時全失能定義為下列何者？", options: ["死亡", "部分永久全失能", "輕傷害", "暫時不能恢復工作1日以上"], ans: 3 }
-    ];
+    // 清空內建代表性題庫
+    const DEFAULT_QUESTIONS = [];
 
     const STORAGE_KEY = "osh_supervisor_quiz_db_v3";
     const HISTORY_KEY = "osh_supervisor_quiz_history_v1";
@@ -796,7 +774,7 @@
       const badge = document.getElementById("dbStatusBadge");
       badge.textContent = `目前題庫：共 ${questionDB.length} 題`;
       const notice = document.getElementById("importNotice");
-      if (questionDB.length > 500) {
+      if (questionDB.length > 0) {
         notice.className = "bg-emerald-50 border-l-4 border-emerald-600 p-4 rounded-r-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3";
         notice.innerHTML = `
           <div>
@@ -805,26 +783,35 @@
           </div>
           <button onclick="openImportModal()" class="shrink-0 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3.5 py-2 rounded-lg">重新匯入/檢視統計</button>
         `;
+      } else {
+        notice.className = "bg-indigo-50 border-l-4 border-indigo-600 p-4 rounded-r-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3";
+        notice.innerHTML = `
+          <div>
+            <h2 class="font-bold text-indigo-950 text-sm md:text-base">💡 請先匯入題庫！</h2>
+            <p class="text-xs md:text-sm text-indigo-800 mt-0.5">點擊右上角「匯入完整 PDF 題庫」選擇您的題庫檔案，系統會嘗試依題庫章節標題分類，匯入後請檢查各章節題數。</p>
+          </div>
+          <button onclick="openImportModal()" class="shrink-0 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-4 py-2 rounded-lg shadow">立即匯入 PDF</button>
+        `;
       }
     }
 
     // ==================== 100% 精準章節切割與題庫解析引擎 ====================
     const SECTION_MARKERS = [
-      { category: "企業經營風險與安全衛生", regex: /企業經營風險與安全衛生(?:\s*\(含組織協調與溝通\))?\s*(?=\([1-4I]\)\s*1\.)/ },
+      { category: "企業經營風險與安全衛生(含組織協調與溝通)", regex: /企業經營風險與安全衛生(?:\s*\(含組織協調與溝通\))?\s*(?=\([1-4I]\)\s*1\.)/ },
       { category: "職業安全相關法規", regex: /職業安全(?:衛生)?相關法規\s*(?=\([1-4I]\)\s*1\.)/ },
       { category: "職業安全衛生概論", regex: /職業安全衛生概論\s*(?=\([1-4I]\)\s*1\.)/ },
       { category: "職業安全衛生管理系統介紹", regex: /職業安全衛生管理系統介紹\s*(?=\([1-4I]\)\s*1\.)/ },
-      { category: "職業安全衛生管理系統介紹", regex: /風險評估\s*(?=\([1-4I]\)\s*1\.)/ },
+      { category: "風險評估", regex: /風險評估\s*(?=\([1-4I]\)\s*1\.)/ },
       { category: "承攬管理", regex: /承攬管理\s*(?=\([1-4I]\)\s*1\.)/ },
       { category: "採購管理", regex: /採購管理\s*(?=\([1-4I]\)\s*1\.)/ },
-      { category: "緊急應變管理", regex: /緊急應變管理(?:\s*\(含急救\))?\s*(?=\([1-4I]\)\s*1\.)/ },
+      { category: "緊急應變管理(含急救)", regex: /緊急應變管理(?:\s*\(含急救\))?\s*(?=\([1-4I]\)\s*1\.)/ },
       { category: "墜落危害預防管理實務", regex: /墜落危害預防管理實務\s*(?=\([1-4I]\)\s*1\.)/ },
       { category: "機械安全管理實務", regex: /機械安全管理實務\s*(?=\([1-4I]\)\s*1\.)/ },
       { category: "火災爆炸預防管理實務", regex: /火災爆炸預防管理實務\s*(?=\([1-4I]\)\s*1\.)/ },
       { category: "感電危害預防管理實務", regex: /感電危害預防管理實務\s*(?=\([1-4I]\)\s*1\.)/ },
-      { category: "倒塌崩塌危害預防管理實務", regex: /倒塌崩塌危害預防管理實務(?:\s*\(含物體飛落[、,]?被撞危害預防\))?\s*(?=\([1-4I]\)\s*1\.)/ },
-      { category: "化學品危害預防管理實務", regex: /化學[性品]危害預防管理實務(?:\s*\(含缺氧危害預防\))?\s*(?=\([1-4I]\)\s*1\.)/ },
-      { category: "物理性危害預防管理實務", regex: /物理性危害預防管理實務(?:\s*\(含人因危害預防\))?\s*(?=\([1-4I]\)\s*1\.)/ },
+      { category: "倒塌崩塌危害預防管理實務(含物體飛落、被撞危害預防)", regex: /倒塌崩塌危害預防管理實務(?:\s*\(含物體飛落[、,]?被撞危害預防\))?\s*(?=\([1-4I]\)\s*1\.)/ },
+      { category: "化學性危害預防管理實務(含缺氧危害預防)", regex: /化學[性品]危害預防管理實務(?:\s*\(含缺氧危害預防\))?\s*(?=\([1-4I]\)\s*1\.)/ },
+      { category: "物理性危害預防管理實務(含人因危害預防)", regex: /物理性危害預防管理實務(?:\s*\(含人因危害預防\))?\s*(?=\([1-4I]\)\s*1\.)/ },
       { category: "健康管理與健康促進", regex: /健康管理與健康促進\s*(?=\([1-4I]\)\s*1\.)/ },
       { category: "職業災害調查處理與統計", regex: /職業災害調查處理與統計\s*(?=\([1-4I]\)\s*1\.)/ }
     ];
@@ -855,7 +842,7 @@
 
       if (foundSections.length === 0) {
         foundSections.push({
-          category: "企業經營風險與安全衛生",
+          category: "企業經營風險與安全衛生(含組織協調與溝通)",
           startIndex: 0,
           contentStart: 0
         });
@@ -868,7 +855,8 @@
         const nextSecStart = (s + 1 < foundSections.length) ? foundSections[s + 1].startIndex : cleaned.length;
         const sectionText = cleaned.slice(currentSec.contentStart, nextSecStart);
 
-        const qHeaderRegex = /\(([1-4I])\)\s*(\d{1,3})\s*[\.、]?\s*/g;
+        // 重大修正點：將正則最後的 ? 移除，避免誤判包含數字的選項為題號 (例如「(1)10」誤判為第10題)
+        const qHeaderRegex = /\(([1-4I])\)\s*(\d{1,3})\s*[\.、]\s*/g;
         let matches = [];
         let m;
         while ((m = qHeaderRegex.exec(sectionText)) !== null) {
@@ -1004,7 +992,7 @@
     }
 
     function resetToDefaultDB() {
-      if (!confirm("確定要清除已匯入的題庫，還原為預設範例題嗎？")) return;
+      if (!confirm("確定要清空所有目前保存的題庫資料嗎？")) return;
       localStorage.removeItem(STORAGE_KEY);
       questionDB = [...DEFAULT_QUESTIONS];
       persistLocalData();
