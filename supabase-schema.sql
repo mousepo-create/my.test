@@ -1,10 +1,14 @@
--- 在 Supabase 專案的 SQL Editor 執行一次
+-- 新建或升級既有 Supabase 資料表：可重複執行
 create table if not exists public.osh_quiz_data (
   user_id uuid primary key references auth.users(id) on delete cascade,
   question_db jsonb not null default '[]'::jsonb,
+  wrong_db jsonb not null default '[]'::jsonb,
   quiz_history jsonb not null default '[]'::jsonb,
   updated_at timestamptz not null default now()
 );
+
+alter table public.osh_quiz_data
+  add column if not exists wrong_db jsonb not null default '[]'::jsonb;
 
 alter table public.osh_quiz_data enable row level security;
 
